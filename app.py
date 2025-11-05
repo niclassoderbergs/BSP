@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 
-st.set_page_config(page_title="Flex Optimizer – BRP=BSP scenarier", layout="wide")
+st.set_page_config(page_title="Scenariosimulator för BRP&BSP", layout="wide")
 
 # ---------- Hjälpfunktioner ----------
 def normal_pdf(x, mu, sigma):
@@ -54,7 +54,7 @@ P_DA  = st.sidebar.number_input(
 )
 # 5) Pris Obalanskostnad (standard 5 €/MWh)
 P_IMB = st.sidebar.number_input(
-    "Pris Obalanskostnad P_IMB (EUR/MWh)", min_value=-200.0, value=7.0, step=0.5, format="%.2f"
+    "Pris Obalanskostnad P_IMB (EUR/MWh)", min_value=-200.0, value=8.0, step=0.5, format="%.2f"
 )
 
 # Tecken för handel i tabellen
@@ -73,7 +73,7 @@ P_COMP = P_IMB if use_imb_for_comp else P_comp_custom
 use_imb_for_pen  = st.sidebar.checkbox("BSP avdrag över/underleverans = obalanspris", value=True)
 P_pen_custom     = st.sidebar.number_input(
     "BSP avdragspris P_PEN (EUR/MWh)",
-    min_value=-200.0, value=8.0, step=1.0, format="%.2f",
+    min_value=-200.0, value=9.0, step=1.0, format="%.2f",
     disabled=use_imb_for_pen
 )
 P_PEN = P_IMB if use_imb_for_pen else P_pen_custom
@@ -92,7 +92,7 @@ mu    = st.sidebar.number_input("Visnings-μ (MWh)", min_value=0.0, value=max(E_
 sigma = st.sidebar.number_input("Visnings-σ (MWh)", min_value=0.1, value=4.0, step=0.1, format="%.2f")
 
 # ---------- Rubrik ----------
-st.title("⚡ Flex Optimizer – BRP=BSP och BRP≠BSP")
+st.title("Scenariosimulator för BRP&BSP")
 st.caption(
     "Scenarier: (1) Bud + underleverans, (2) Bud + överleverans (spegling), (3) Uppmätt aktivering (BRP=BSP), "
     "(4) Uppmätt aktivering, ingen kompensation (BRP≠BSP), "
