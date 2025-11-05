@@ -205,7 +205,7 @@ def _fmt_cell(v, enhet):
 for col in df_brp.columns[1:-1]:
     df_brp[col] = [_fmt_cell(v, e) for v, e in zip(df_brp[col], df_brp["Enhet"])]
 
-st.dataframe(df_brp, use_container_width=True, height=680)
+st.dataframe(df_brp, use_container_width=True, height=540)
 
 # ---------- TABELL 2: BSP (Scenario 1–5) ----------
 st.markdown("## BSP")
@@ -317,7 +317,7 @@ def _fmt(v, enhet):
 for col in df_bsp.columns[1:-1]:
     df_bsp[col] = [_fmt(v, e) for v, e in zip(df_bsp[col], df_bsp["Enhet"])]
 
-st.dataframe(df_bsp, use_container_width=True, height=460)
+st.dataframe(df_bsp, use_container_width=True, height=400)
 
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
@@ -403,7 +403,7 @@ def _fmt_re(v, e):
 for col in df_re.columns[1:-1]:
     df_re[col] = [_fmt_re(v, e) for v, e in zip(df_re[col], df_re["Enhet"])]
 
-st.dataframe(df_re, use_container_width=True, height=460)
+st.dataframe(df_re, use_container_width=True, height=260)
 
 
 # ---------- TABELL 4: Sammanställning – resultat per aktör och scenario ----------
@@ -513,5 +513,5 @@ def _fmt_eur_or_na(v, e):
 for col in df_sum.columns[1:-1]:
     df_sum[col] = [_fmt_eur_or_na(v, e) for v, e in zip(df_sum[col], df_sum["Enhet"])]
 
-st.dataframe(df_sum, use_container_width=True, height=400)
+st.dataframe(df_sum, use_container_width=True, height=290)
 
