@@ -778,57 +778,6 @@ st.caption(
 )
 
 
-# ---------- TABELL 6: Aktörers resultat efter kompensation ----------
-st.markdown("## Aktörers resultat efter kompensation")
-
-# Kompensationsbehov = max(0, ökad totalkostnad slutkund)
-def _pos(x):
-    try:
-        return x if float(x) > 0 else 0.0
-    except:
-        return "NA"
-
-comp_need_s1 = _pos(extra_s1)
-comp_need_s2 = _pos(extra_s2)
-comp_need_s3 = _pos(extra_s3)
-comp_need_s4 = _pos(extra_s4)
-comp_need_s5 = _pos(extra_s5)
-
-# Nytt resultat efter kompensation
-# (för enkelhet: påverkar endast BSP som betalar kompensation)
-res_after_s1 = (bsp_s1["BSP nettoresultat"] - comp_need_s1) if comp_need_s1 != "NA" else "NA"
-res_after_s2 = (bsp_s2["BSP nettoresultat"] - comp_need_s2) if comp_need_s2 != "NA" else "NA"
-res_after_s3 = (bsp_s3["BSP nettoresultat"] - comp_need_s3) if comp_need_s3 != "NA" else "NA"
-res_after_s4 = (bsp_s4["BSP nettoresultat"] - comp_need_s4) if comp_need_s4 != "NA" else "NA"
-res_after_s5 = (bsp_s5["BSP nettoresultat"] - comp_need_s5) if comp_need_s5 != "NA" else "NA"
-
-rows_bsp_comp = [
-    ("Kompensation till slutkund för neutralisering", comp_need_s1, comp_need_s2, comp_need_s3, comp_need_s4, comp_need_s5, "EUR"),
-    ("Aktörers resultat efter kompensation",          res_after_s1, res_after_s2, res_after_s3, res_after_s4, res_after_s5, "EUR"),
-]
-
-df_bsp_comp = pd.DataFrame(
-    rows_bsp_comp,
-    columns=[
-        "Fält",
-        "Scenario 1 - BRP=BSP, bud/under",
-        "Scenario 2 - BRP=BSP, bud/över",
-        "Scenario 3 - BRP=BSP, uppmätt",
-        "Scenario 4 - BRP≠BSP, uppmätt (ingen komp)",
-        "Scenario 5 - BRP≠BSP, uppmätt (med komp)",
-        "Enhet",
-    ],
-)
-
-# Återanvänd formatterare från tidigare tabeller
-for col in df_bsp_comp.columns[1:-1]:
-    df_bsp_comp[col] = [_fmt_any(v, u) for v, u in zip(df_bsp_comp[col], df_bsp_comp["Enhet"])]
-
-st.dataframe(df_bsp_comp, use_container_width=True, height=220)
-st.caption(
-    "Kompensation = max(0, ‘Ökad totalkostnad slutkund’). "
-    "‘Aktörers resultat efter kompensation’ visar resultatet efter att denna kompensation betalats ut av BSP."
-)
 
 
 # ---------- TABELL 6: Aktörers resultat efter kompensation ----------
