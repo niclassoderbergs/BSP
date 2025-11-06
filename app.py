@@ -50,11 +50,11 @@ E_akt = st.sidebar.number_input("Uppmätt aktivering E_akt (MWh)", min_value=0.0
 
 # 4) Pris DA (standard 2 €/MWh)
 P_DA  = st.sidebar.number_input(
-    "Pris DA P_DA (EUR/MWh)", min_value=-200.0, value=5.0, step=0.5, format="%.2f"
+    "Pris DA P_DA (EUR/MWh)", min_value=-200.0, value=2.0, step=0.5, format="%.2f"
 )
 # 5) Pris Obalanskostnad (standard 5 €/MWh)
 P_IMB = st.sidebar.number_input(
-    "Pris Obalanskostnad P_IMB (EUR/MWh)", min_value=-200.0, value=8.0, step=0.5, format="%.2f"
+    "Pris Obalanskostnad P_IMB (EUR/MWh)", min_value=-200.0, value=5.0, step=0.5, format="%.2f"
 )
 
 # Tecken för handel i tabellen
@@ -103,6 +103,32 @@ st.caption(
 # ---------- Grundtermer ----------
 dP = P_IMB - P_DA
 
+# init
+st.session_state.setdefault("re_forward_balance_costs", True)
+
+
+
+# --- Initiera huvudstate en gång högst upp i appen (innan widgets används) ---
+if "brp_forward_balance_costs" not in st.session_state:
+    st.session_state["brp_forward_balance_costs"] = True
+
+# Hjälpare för att spegla dubblett-widgeten till huvudnyckeln
+def _sync_brb_copy_to_main(copy_key: str):
+    st.session_state["brp_forward_balance_costs"] = st.session_state[copy_key]
+
+
+
+# ---------- Checkbox före BRP-tabellen ----------
+# Checkbox ovanför BRP-tabellen
+brp_forward_balance_costs = st.checkbox(
+    "BRP vidarefakturerar balanskostnader till elhandlare",
+    key="brp_forward_balance_costs",   # <-- huvudnyckeln
+    help="Om urkryssad står BRP själv för balanskostnaden och fakturerar inte elhandlaren."
+)
+
+
+
+
 # ---------- TABELL 1: BRP (Scenario 1–5 sida vid sida) ----------
 st.markdown("## BRP")
 
@@ -113,22 +139,26 @@ def _brp_metrics(uppmatt_mwh: float, obalansjust_mwh: float):
       - obalansjustering (obalansjust_mwh): E_bud (scen 1 & 2) eller E_akt (scen 3–5)
     """
     handel_mwh = handel_sign * V_DA  # Köp = negativt, Sälj = positivt
-    kostnad_handel_eur   = handel_mwh * P_DA
+    kostnad_handel_eur = handel_mwh * P_DA
 
     # Avräkningsvolym och obalans
     summa_avr_balans_mwh = handel_mwh + obalansjust_mwh
-    obalans_mwh          = uppmatt_mwh + summa_avr_balans_mwh
+    obalans_mwh = uppmatt_mwh + summa_avr_balans_mwh
 
-    # Balanshandel enligt din konvention (köp − / sälj +)
-    balanshandel_mwh     = -obalans_mwh
+    # Balanshandel enligt konvention
+    balanshandel_mwh = -obalans_mwh
 
     # Balanskostnad följer balanshandelns tecken
-    balanskostnad_eur    = balanshandel_mwh * P_IMB
+    balanskostnad_eur = balanshandel_mwh * P_IMB
 
-    inkopt_el_fakt_eur   = abs(handel_mwh) * P_DA
-    obalans_fakt_eur     = -balanskostnad_eur
-    brp_fakt_re_eur      = inkopt_el_fakt_eur + obalans_fakt_eur
-    brp_netto_eur        = kostnad_handel_eur + balanskostnad_eur + inkopt_el_fakt_eur + obalans_fakt_eur
+    # 🔸 Om BRP inte vidarefakturerar – elhandlaren slipper denna kostnad
+    obalans_fakt_eur = 0.0 if not brp_forward_balance_costs else -balanskostnad_eur
+
+    inkopt_el_fakt_eur = abs(handel_mwh) * P_DA
+    brp_fakt_re_eur = inkopt_el_fakt_eur + obalans_fakt_eur
+
+    # BRP:s resultat – påverkas av om vidarefakturering sker
+    brp_netto_eur = kostnad_handel_eur + balanskostnad_eur + inkopt_el_fakt_eur + obalans_fakt_eur
 
     return {
         "Obalansjusteras baserat på": "Bud" if abs(obalansjust_mwh - E_bud) < 1e-9 else "Uppmätt aktivering",
@@ -146,6 +176,7 @@ def _brp_metrics(uppmatt_mwh: float, obalansjust_mwh: float):
         "BRP fakturerar elhandlare": brp_fakt_re_eur,
         "BRP nettokostnad": brp_netto_eur,
     }
+
 
 # Scen 1 & 2: under/överleverans runt S (summa avräknas i balans vid bud-justering)
 S = (handel_sign * V_DA) + E_bud
@@ -205,7 +236,18 @@ def _fmt_cell(v, enhet):
 for col in df_brp.columns[1:-1]:
     df_brp[col] = [_fmt_cell(v, e) for v, e in zip(df_brp[col], df_brp["Enhet"])]
 
-st.dataframe(df_brp, use_container_width=True, height=540)
+st.dataframe(df_brp, use_container_width=True, height=570)
+
+
+
+
+# ---------- Checkbox för avdrag på över/underleverans ----------
+apply_penalty = st.checkbox(
+    "Tillämpa avdrag för över/underleverans",
+    value=False,
+    help="Om urkryssad sätts över/underleveranspris till 0 €/MWh.",
+)
+
 
 # ---------- TABELL 2: BSP (Scenario 1–5) ----------
 st.markdown("## BSP")
@@ -222,9 +264,10 @@ def _bsp_metrics_for_scenario(scen: int):
         vol_pay = E_bud
         price_pay = P_COMP                                    
         res_pay = vol_pay * price_pay
-        vol_dev = abs(E_akt - E_bud)
-        price_dev = P_PEN
-        res_dev = -(vol_dev * price_dev)
+        # Under/överleverans (mot bud) – bara scen 1 & 2
+        vol_dev = abs(E_akt - E_bud)                     # MWh
+        price_dev = P_PEN if apply_penalty else 0.0      # €/MWh (0 om checkbox urkryssad)
+        res_dev = -(vol_dev * price_dev)                 # € (avdrag)
         vol_comp = 0.0
         price_comp = 0.0
         res_comp = 0.0
@@ -317,62 +360,95 @@ def _fmt(v, enhet):
 for col in df_bsp.columns[1:-1]:
     df_bsp[col] = [_fmt(v, e) for v, e in zip(df_bsp[col], df_bsp["Enhet"])]
 
-st.dataframe(df_bsp, use_container_width=True, height=400)
+st.dataframe(df_bsp, use_container_width=True, height=430)
 
+
+
+# ---------- Checkbox: Elhandlaren vidarefakturerar balanskostnader ----------
+# Initiera session state vid behov
+if "re_forward_balance_costs" not in st.session_state:
+    st.session_state["re_forward_balance_costs"] = True
+
+# Visa checkbox ovanför RE-tabellen
+re_forward_balance_costs = st.checkbox(
+    "Elhandlaren vidarefakturerar balanskostnader till slutkunden",
+    key="re_forward_balance_costs",
+    help="Om urkryssad står elhandlaren själv för balanskostnaden och fakturerar inte slutkunden."
+)
+
+
+# Hämtar värdet direkt från session_state så det fungerar även vid dubblett-checkboxes
+re_forward_balance_costs = st.session_state["re_forward_balance_costs"]
+
+
+
+# ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
 st.markdown("## Elhandlare")
 
-def _re_metrics_v2(m_brp: dict, e_cons: float, obalansjust_mwh: float, with_comp: bool):
-    """
-    Beräknar RE-rader med rätt tecken och uppdaterade namn.
-    with_comp:
-      - True  -> kompensation ingår
-      - False -> ingen kompensation
-    """
-    # Inköp från BRP (alltid kostnad för RE)
+def _re_metrics_v3(m_brp: dict, e_cons: float, obalansjust_mwh: float, with_comp: bool):
+    # 1) Läs av checkboxen (hanterar dubbletter via session_state)
+    re_forward_balance_costs = st.session_state.get("re_forward_balance_costs", True)
+
+    # 2) Inköp från BRP (alltid kostnad för RE)
     re_inkop_eur = -abs(m_brp["Handel"]) * P_DA
 
-    # Balansfaktura från BRP: positivt tal i m_brp betyder att BRP fakturerar RE,
-    # vilket är en kostnad för RE => negativt tecken här
-    re_balansfakt_eur = -m_brp["Obalanskostnad som faktureras"]
+    # 3) Balansfaktura från BRP (0 om BRP inte vidarefakturerar till RE)
+    if brp_forward_balance_costs:
+        re_balansfakt_eur = -m_brp["Obalanskostnad som faktureras"]   # kostnad för RE
+    else:
+        re_balansfakt_eur = 0.0
 
-    # Kompensation enligt scenario
+    # 4) Kompensationen till RE enligt scenario (kostnad för RE)
     re_comp_vol_mwh = obalansjust_mwh if with_comp else 0.0
     re_comp_eur = re_comp_vol_mwh * P_RECOMP
 
-    # Slutkund
-    re_cust_vol_mwh = e_cons
-    re_cust_cost_eur = re_cust_vol_mwh * P_DA
+    # 5) Vad av detta skickar RE vidare till slutkund? (styrt av checkboxen)
+    balans_till_kund_eur = re_balansfakt_eur if re_forward_balance_costs else 0.0
 
-    # Resultat för elhandlaren
+    # 6) Kostnad att fakturera kunden (intäkt för RE) = minus (det som skickas vidare)
+    re_kostnad_att_fakturera_eur = -(re_inkop_eur + balans_till_kund_eur + re_comp_eur)
+
+    # 7) Volym och kundpris
+    re_cust_vol_mwh = e_cons
+    slutkund_elpris_per_mwh = (re_kostnad_att_fakturera_eur / re_cust_vol_mwh) if re_cust_vol_mwh else 0.0
+    re_cust_cost_eur = re_cust_vol_mwh * slutkund_elpris_per_mwh  # intäkt för RE
+
+    # 8) RE:s resultat (RE:s verkliga kostnader + intäkten från kund)
     re_net_eur = re_inkop_eur + re_balansfakt_eur + re_comp_eur + re_cust_cost_eur
 
     return {
         "Inköpt el fakturerad av BRP": re_inkop_eur,
-        "Balanskostnad fakturerad av BRP": re_balansfakt_eur,
+        "Balanskostnad fakturerad av BRP": re_balansfakt_eur,         # kostnad för RE
         "Kompensationsvolym för flexibilitet": re_comp_vol_mwh,
-        "Kompensationsbelopp": re_comp_eur,
+        "Kompensationsbelopp": re_comp_eur,                           # kostnad för RE
+        "Kostnad att fakturera kunden": re_kostnad_att_fakturera_eur, # intäkt (positiv)
         "Volym som faktureras slutkund": re_cust_vol_mwh,
-        "Kostnad som faktureras slutkund": re_cust_cost_eur,
+        "Slutkundens elpris per MWh": slutkund_elpris_per_mwh,
+        "Kostnad som faktureras slutkund": re_cust_cost_eur,          # intäkt (positiv)
         "Resultat": re_net_eur,
     }
 
-# Scenarier: 1–3 ingen komp, 4 ingen komp, 5 med kompensation
-re_s1 = _re_metrics_v2(m1, E_cons_s1, E_bud, with_comp=False)
-re_s2 = _re_metrics_v2(m2, E_cons_s2, E_bud, with_comp=False)
-re_s3 = _re_metrics_v2(m3, E_cons_s3, E_akt, with_comp=False)
-re_s4 = _re_metrics_v2(m4, E_cons_s4, E_akt, with_comp=False)
-re_s5 = _re_metrics_v2(m5, E_cons_s5, E_akt, with_comp=True)
 
-# Tabell RE
+
+# Scenarier: 1–3 ingen komp, 4 ingen komp, 5 med kompensation
+re_s1 = _re_metrics_v3(m1, E_cons_s1, E_bud, with_comp=False)
+re_s2 = _re_metrics_v3(m2, E_cons_s2, E_bud, with_comp=False)
+re_s3 = _re_metrics_v3(m3, E_cons_s3, E_akt, with_comp=False)
+re_s4 = _re_metrics_v3(m4, E_cons_s4, E_akt, with_comp=False)
+re_s5 = _re_metrics_v3(m5, E_cons_s5, E_akt, with_comp=True)
+
+# Tabell RE – uppdaterad ordning och enheter
 re_row_specs = [
     ("Inköpt el fakturerad av BRP", "EUR"),
     ("Balanskostnad fakturerad av BRP", "EUR"),
     ("Kompensationsvolym för flexibilitet", "MWh"),
     ("Kompensationsbelopp", "EUR"),
+    ("Kostnad att fakturera kunden", "EUR"),      # NY
     ("Volym som faktureras slutkund", "MWh"),
-    ("Kostnad som faktureras slutkund", "EUR"),
+    ("Slutkundens elpris per MWh", "€/MWh"),      # NY
+    ("Kostnad som faktureras slutkund", "EUR"),   # ändrad beräkning
     ("Resultat", "EUR"),
 ]
 
@@ -394,6 +470,8 @@ def _fmt_re(v, e):
     try:
         if e == "MWh":
             return f"{float(v):,.0f}"
+        if e == "€/MWh":
+            return f"{float(v):,.2f}"
         if e == "EUR":
             return f"{float(v):,.0f}"
     except:
@@ -403,13 +481,35 @@ def _fmt_re(v, e):
 for col in df_re.columns[1:-1]:
     df_re[col] = [_fmt_re(v, e) for v, e in zip(df_re[col], df_re["Enhet"])]
 
-st.dataframe(df_re, use_container_width=True, height=260)
+st.dataframe(df_re, use_container_width=True, height=360)
 
 
+st.checkbox(
+    "BRP vidarefakturerar balanskostnader till elhandlare",
+    key="brp_forward_balance_costs_copy",                    # <-- unik nyckel
+    value=st.session_state["brp_forward_balance_costs"],     # spegla aktuellt värde
+    on_change=_sync_brb_copy_to_main,                        # skriv tillbaka vid ändring
+    args=("brp_forward_balance_costs_copy",),
+)
+
+
+def _sync_re_copy_to_main():
+    st.session_state["re_forward_balance_costs"] = st.session_state["re_forward_balance_costs_copy"]
+
+st.checkbox(
+    "Elhandlaren vidarefakturerar balanskostnader till slutkunden",
+    key="re_forward_balance_costs_copy",
+    value=st.session_state["re_forward_balance_costs"],  # spegla aktuellt värde
+    on_change=_sync_re_copy_to_main
+)
+
+
+
 # ---------- TABELL 4: Sammanställning – resultat per aktör och scenario ----------
 # ---------- TABELL 4: Sammanställning – resultat per aktör och scenario ----------
 # ---------- TABELL 4: Sammanställning – resultat per aktör och scenario ----------
-st.markdown("## Sammanställning – resultat per aktör och scenario")
+st.markdown("## Aktörers resultat per scenario")
+
 
 # Resultat per aktör & scenario
 brp_s1, brp_s2, brp_s3, brp_s4, brp_s5 = (
@@ -449,10 +549,12 @@ total_s4 = _na_or_sum3(brp_s4, bsp_s4_res, re_s4_res, False)
 total_s5 = _na_or_sum3(brp_s5, bsp_s5_res, re_s5_res, False)
 
 # --- NYTT: Målresultat (Scenario 5 – BSP resultat), visas bara när BRP=BSP ---
+# --- NYTT: Målresultat för aktörer (Scenario 5 – BSP resultat), visas bara när BRP=BSP ---
+# --- NYTT: Målresultat för aktörer (Scenario 5 – BSP resultat), visas bara när BRP=BSP ---
 goal_value = bsp_s5_res
 
 goal_row = (
-    "Målresultat (Scenario 5 – BSP resultat)",
+    "Målresultat för aktör (Scenario 5 – BSP resultat)",
     _na_or_value(goal_value, True),
     _na_or_value(goal_value, True),
     _na_or_value(goal_value, True),
@@ -461,14 +563,14 @@ goal_row = (
     "EUR/NA",
 )
 
-# --- NYTT: Avvikelse mot mål, visas bara när BRP=BSP ---
+# --- NYTT: Avvikelse mot aktörers målresultat ---
 def _diff_or_na(goal, total, enabled: bool):
     if not enabled or isinstance(total, str):
         return "NA"
     return goal - total
 
 diff_row = (
-    "Avvikelse mot målresultat",
+    "Avvikelse mot aktörers målresultat",
     _diff_or_na(goal_value, total_s1, True),
     _diff_or_na(goal_value, total_s2, True),
     _diff_or_na(goal_value, total_s3, True),
@@ -476,6 +578,49 @@ diff_row = (
     _diff_or_na(goal_value, total_s5, False),
     "EUR/NA",
 )
+
+# --- Slutkundens elpris per MWh (från RE-tabellen) per scenario ---
+price_s1 = re_s1["Kostnad som faktureras slutkund"] / re_s1["Volym som faktureras slutkund"]
+price_s2 = re_s2["Kostnad som faktureras slutkund"] / re_s2["Volym som faktureras slutkund"]
+price_s3 = re_s3["Kostnad som faktureras slutkund"] / re_s3["Volym som faktureras slutkund"]
+price_s4 = re_s4["Kostnad som faktureras slutkund"] / re_s4["Volym som faktureras slutkund"]
+price_s5 = re_s5["Kostnad som faktureras slutkund"] / re_s5["Volym som faktureras slutkund"]
+
+current_price_row = (
+    "Slutkundens elpris per MWh (från RE-tabellen)",
+    price_s1, price_s2, price_s3, price_s4, price_s5,
+    "€/MWh",
+)
+
+# --- NYTT: Målresultat för slutkunds elpris (Scenario 5) ---
+goal_price_value = price_s5
+goal_price_row = (
+    "Målresultat för slutkunds elpris (Scenario 5 – Slutkundens elpris per MWh)",
+    _na_or_value(goal_price_value, True),
+    _na_or_value(goal_price_value, True),
+    _na_or_value(goal_price_value, True),
+    _na_or_value(goal_price_value, False),
+    _na_or_value(goal_price_value, False),
+    "€/MWh",
+)
+
+# --- NYTT: Avvikelse slutkundens elpris (scenario-pris minus målpris) ---
+def _diff_price_or_na(goal, price, enabled: bool):
+    if not enabled or isinstance(price, str):
+        return "NA"
+    return price - goal
+
+diff_price_row = (
+    "Avvikelse slutkundens elpris",
+    _diff_price_or_na(goal_price_value, price_s1, True),
+    _diff_price_or_na(goal_price_value, price_s2, True),
+    _diff_price_or_na(goal_price_value, price_s3, True),
+    _diff_price_or_na(goal_price_value, price_s4, False),
+    _diff_price_or_na(goal_price_value, price_s5, False),
+    "€/MWh",
+)
+
+
 
 # Tabellinnehåll
 rows_sum = [
@@ -487,6 +632,9 @@ rows_sum = [
     goal_row,
     diff_row,
 ]
+
+
+
 
 df_sum = pd.DataFrame(
     rows_sum,
@@ -502,16 +650,248 @@ df_sum = pd.DataFrame(
 )
 
 # Formattera värden
-def _fmt_eur_or_na(v, e):
-    if isinstance(v, str):  # "NA"
+def _fmt_any(v, unit):
+    # Låt "NA" passera som text
+    if isinstance(v, str):
         return v
     try:
-        return f"{float(v):,.0f}" if e in ("EUR", "EUR/NA") else v
+        if unit in ("EUR", "EUR/NA"):
+            return f"{float(v):,.0f}"
+        if unit == "€/MWh":
+            return f"{float(v):,.2f}"
+        if unit == "MWh":
+            return f"{float(v):,.0f}"
+    except Exception:
+        return str(v)
+    return str(v)
+
+for col in df_sum.columns[1:-1]:
+    df_sum[col] = [_fmt_any(v, u) for v, u in zip(df_sum[col], df_sum["Enhet"])]
+    
+for col in df_sum.columns[1:-1]:
+    df_sum[col] = df_sum[col].astype(str)
+
+st.dataframe(df_sum, use_container_width=True, height=340)
+
+
+
+
+
+# ---------- TABELL 5: Slutkundens elpris per scenario ----------
+# ---------- TABELL 5: Slutkundens elpris per scenario ----------
+# ---------- TABELL 5: Slutkundens elpris per scenario ----------
+st.markdown("## Slutkundens elpris per scenario")
+
+# Pris per scenario (hämtat från RE-tabellen)
+price_s1 = re_s1["Kostnad som faktureras slutkund"] / re_s1["Volym som faktureras slutkund"] if re_s1["Volym som faktureras slutkund"] else 0.0
+price_s2 = re_s2["Kostnad som faktureras slutkund"] / re_s2["Volym som faktureras slutkund"] if re_s2["Volym som faktureras slutkund"] else 0.0
+price_s3 = re_s3["Kostnad som faktureras slutkund"] / re_s3["Volym som faktureras slutkund"] if re_s3["Volym som faktureras slutkund"] else 0.0
+price_s4 = re_s4["Kostnad som faktureras slutkund"] / re_s4["Volym som faktureras slutkund"] if re_s4["Volym som faktureras slutkund"] else 0.0
+price_s5 = re_s5["Kostnad som faktureras slutkund"] / re_s5["Volym som faktureras slutkund"] if re_s5["Volym som faktureras slutkund"] else 0.0
+
+# Målpris = scenario 5
+goal_price_value = price_s5
+
+def _fmt_any(v, unit):
+    if isinstance(v, str):
+        return v
+    try:
+        if unit in ("EUR", "EUR/NA"):
+            return f"{float(v):,.0f}"
+        if unit == "€/MWh":
+            return f"{float(v):,.2f}"
+        return v
     except:
         return v
 
-for col in df_sum.columns[1:-1]:
-    df_sum[col] = [_fmt_eur_or_na(v, e) for v, e in zip(df_sum[col], df_sum["Enhet"])]
+def _diff_price(goal, price):
+    try:
+        return price - goal
+    except:
+        return "NA"
 
-st.dataframe(df_sum, use_container_width=True, height=290)
+def _extra_cost(diff, volume):
+    try:
+        return diff * volume
+    except:
+        return "NA"
 
+# Beräkna avvikelser först
+diff_s1 = _diff_price(goal_price_value, price_s1)
+diff_s2 = _diff_price(goal_price_value, price_s2)
+diff_s3 = _diff_price(goal_price_value, price_s3)
+diff_s4 = _diff_price(goal_price_value, price_s4)
+diff_s5 = _diff_price(goal_price_value, price_s5)
+
+# Beräkna ökad totalkostnad baserat på diff * volym
+extra_s1 = _extra_cost(diff_s1, re_s1["Volym som faktureras slutkund"])
+extra_s2 = _extra_cost(diff_s2, re_s2["Volym som faktureras slutkund"])
+extra_s3 = _extra_cost(diff_s3, re_s3["Volym som faktureras slutkund"])
+extra_s4 = _extra_cost(diff_s4, re_s4["Volym som faktureras slutkund"])
+extra_s5 = _extra_cost(diff_s5, re_s5["Volym som faktureras slutkund"])
+
+rows_cust = [
+    (
+        "Slutkundens elpris (från RE-tabellen)",
+        price_s1, price_s2, price_s3, price_s4, price_s5,
+        "€/MWh",
+    ),
+    (
+        "Målresultat för slutkunds elpris (Scenario 5 – Slutkundens elpris per MWh)",
+        goal_price_value, goal_price_value, goal_price_value,
+        goal_price_value, goal_price_value,
+        "€/MWh",
+    ),
+    (
+        "Avvikelse slutkundens elpris",
+        diff_s1, diff_s2, diff_s3, diff_s4, diff_s5,
+        "€/MWh",
+    ),
+    (
+        "Ökad totalkostnad slutkund",
+        extra_s1, extra_s2, extra_s3, extra_s4, extra_s5,
+        "EUR",
+    ),
+]
+
+df_cust = pd.DataFrame(
+    rows_cust,
+    columns=[
+        "Fält",
+        "Scenario 1 - BRP=BSP, bud/under",
+        "Scenario 2 - BRP=BSP, bud/över",
+        "Scenario 3 - BRP=BSP, uppmätt",
+        "Scenario 4 - BRP≠BSP, uppmätt (ingen komp)",
+        "Scenario 5 - BRP≠BSP, uppmätt (med komp)",
+        "Enhet",
+    ],
+)
+
+for col in df_cust.columns[1:-1]:
+    df_cust[col] = [_fmt_any(v, u) for v, u in zip(df_cust[col], df_cust["Enhet"])]
+
+st.dataframe(df_cust, use_container_width=True, height=250)
+
+st.caption(
+    "‘Ökad totalkostnad slutkund’ beräknas som (Avvikelse slutkundens elpris × volym som faktureras slutkund). "
+    "Det visar hur mycket mer eller mindre slutkunden betalar totalt jämfört med scenario 5."
+)
+
+
+# ---------- TABELL 6: Aktörers resultat efter kompensation ----------
+st.markdown("## Aktörers resultat efter kompensation")
+
+# Kompensationsbehov = max(0, ökad totalkostnad slutkund)
+def _pos(x):
+    try:
+        return x if float(x) > 0 else 0.0
+    except:
+        return "NA"
+
+comp_need_s1 = _pos(extra_s1)
+comp_need_s2 = _pos(extra_s2)
+comp_need_s3 = _pos(extra_s3)
+comp_need_s4 = _pos(extra_s4)
+comp_need_s5 = _pos(extra_s5)
+
+# Nytt resultat efter kompensation
+# (för enkelhet: påverkar endast BSP som betalar kompensation)
+res_after_s1 = (bsp_s1["BSP nettoresultat"] - comp_need_s1) if comp_need_s1 != "NA" else "NA"
+res_after_s2 = (bsp_s2["BSP nettoresultat"] - comp_need_s2) if comp_need_s2 != "NA" else "NA"
+res_after_s3 = (bsp_s3["BSP nettoresultat"] - comp_need_s3) if comp_need_s3 != "NA" else "NA"
+res_after_s4 = (bsp_s4["BSP nettoresultat"] - comp_need_s4) if comp_need_s4 != "NA" else "NA"
+res_after_s5 = (bsp_s5["BSP nettoresultat"] - comp_need_s5) if comp_need_s5 != "NA" else "NA"
+
+rows_bsp_comp = [
+    ("Kompensation till slutkund för neutralisering", comp_need_s1, comp_need_s2, comp_need_s3, comp_need_s4, comp_need_s5, "EUR"),
+    ("Aktörers resultat efter kompensation",          res_after_s1, res_after_s2, res_after_s3, res_after_s4, res_after_s5, "EUR"),
+]
+
+df_bsp_comp = pd.DataFrame(
+    rows_bsp_comp,
+    columns=[
+        "Fält",
+        "Scenario 1 - BRP=BSP, bud/under",
+        "Scenario 2 - BRP=BSP, bud/över",
+        "Scenario 3 - BRP=BSP, uppmätt",
+        "Scenario 4 - BRP≠BSP, uppmätt (ingen komp)",
+        "Scenario 5 - BRP≠BSP, uppmätt (med komp)",
+        "Enhet",
+    ],
+)
+
+# Återanvänd formatterare från tidigare tabeller
+for col in df_bsp_comp.columns[1:-1]:
+    df_bsp_comp[col] = [_fmt_any(v, u) for v, u in zip(df_bsp_comp[col], df_bsp_comp["Enhet"])]
+
+st.dataframe(df_bsp_comp, use_container_width=True, height=220)
+st.caption(
+    "Kompensation = max(0, ‘Ökad totalkostnad slutkund’). "
+    "‘Aktörers resultat efter kompensation’ visar resultatet efter att denna kompensation betalats ut av BSP."
+)
+
+
+# ---------- TABELL 6: Aktörers resultat efter kompensation ----------
+st.markdown("## Aktörers resultat efter kompensation")
+
+def _safe_float(x):
+    """Konverterar till float om möjligt, annars returnerar None."""
+    try:
+        return float(x)
+    except (TypeError, ValueError):
+        return None
+
+# Kompensationsbehov = max(0, ökad totalkostnad slutkund)
+def _pos(x):
+    val = _safe_float(x)
+    if val is None:
+        return "NA"
+    return val if val > 0 else 0.0
+
+comp_need_s1 = _pos(extra_s1)
+comp_need_s2 = _pos(extra_s2)
+comp_need_s3 = _pos(extra_s3)
+comp_need_s4 = _pos(extra_s4)
+comp_need_s5 = _pos(extra_s5)
+
+# Hjälpfunktion för säker subtraktion
+def _safe_subtract(a, b):
+    a_val, b_val = _safe_float(a), _safe_float(b)
+    if a_val is None or b_val is None:
+        return "NA"
+    return a_val - b_val
+
+# Nya resultat efter kompensation (BRP+BSP+Elhandlare)
+tot_after_s1 = _safe_subtract(total_s1, comp_need_s1)
+tot_after_s2 = _safe_subtract(total_s2, comp_need_s2)
+tot_after_s3 = _safe_subtract(total_s3, comp_need_s3)
+tot_after_s4 = _safe_subtract(total_s4, comp_need_s4)
+tot_after_s5 = _safe_subtract(total_s5, comp_need_s5)
+
+rows_comp_total = [
+    ("Kompensation till slutkund för neutralisering", comp_need_s1, comp_need_s2, comp_need_s3, comp_need_s4, comp_need_s5, "EUR"),
+    ("Aktörers resultat efter kompensation",          tot_after_s1, tot_after_s2, tot_after_s3, tot_after_s4, tot_after_s5, "EUR"),
+]
+
+df_comp_total = pd.DataFrame(
+    rows_comp_total,
+    columns=[
+        "Fält",
+        "Scenario 1 - BRP=BSP, bud/under",
+        "Scenario 2 - BRP=BSP, bud/över",
+        "Scenario 3 - BRP=BSP, uppmätt",
+        "Scenario 4 - BRP≠BSP, uppmätt (ingen komp)",
+        "Scenario 5 - BRP≠BSP, uppmätt (med komp)",
+        "Enhet",
+    ],
+)
+
+# Formattera
+for col in df_comp_total.columns[1:-1]:
+    df_comp_total[col] = [_fmt_any(v, u) for v, u in zip(df_comp_total[col], df_comp_total["Enhet"])]
+
+st.dataframe(df_comp_total, use_container_width=True, height=200)
+st.caption(
+    "Kompensation = max(0, ‘Ökad totalkostnad slutkund’). "
+    "‘Aktörers resultat efter kompensation’ = (BRP+BSP+Elhandlare resultat) − kompensation."
+)
