@@ -779,7 +779,6 @@ st.caption(
 
 
 
-
 # ---------- TABELL 6: Aktörers resultat efter kompensation ----------
 st.markdown("## Aktörers resultat efter kompensation")
 
@@ -794,7 +793,7 @@ def _safe_float(x):
 def _pos(x):
     val = _safe_float(x)
     if val is None:
-        return "NA"
+        return 0.0
     return val if val > 0 else 0.0
 
 comp_need_s1 = _pos(extra_s1)
@@ -803,19 +802,26 @@ comp_need_s3 = _pos(extra_s3)
 comp_need_s4 = _pos(extra_s4)
 comp_need_s5 = _pos(extra_s5)
 
-# Hjälpfunktion för säker subtraktion
-def _safe_subtract(a, b):
-    a_val, b_val = _safe_float(a), _safe_float(b)
-    if a_val is None or b_val is None:
-        return "NA"
-    return a_val - b_val
+# Hjälpfunktion: hämta rätt grundresultat (total om finns, annars BSP)
+def _base_result(total, bsp):
+    t_val = _safe_float(total)
+    b_val = _safe_float(bsp)
+    return t_val if t_val is not None else (b_val if b_val is not None else 0.0)
 
-# Nya resultat efter kompensation (BRP+BSP+Elhandlare)
-tot_after_s1 = _safe_subtract(total_s1, comp_need_s1)
-tot_after_s2 = _safe_subtract(total_s2, comp_need_s2)
-tot_after_s3 = _safe_subtract(total_s3, comp_need_s3)
-tot_after_s4 = _safe_subtract(total_s4, comp_need_s4)
-tot_after_s5 = _safe_subtract(total_s5, comp_need_s5)
+# Hjälpfunktion: dra av kompensation
+def _subtract_base(total, bsp, comp):
+    base = _base_result(total, bsp)
+    c_val = _safe_float(comp)
+    if c_val is None:
+        c_val = 0.0
+    return base - c_val
+
+# Räkna fram resultat efter kompensation
+tot_after_s1 = _subtract_base(total_s1, bsp_s1_res, comp_need_s1)
+tot_after_s2 = _subtract_base(total_s2, bsp_s2_res, comp_need_s2)
+tot_after_s3 = _subtract_base(total_s3, bsp_s3_res, comp_need_s3)
+tot_after_s4 = _subtract_base(total_s4, bsp_s4_res, comp_need_s4)
+tot_after_s5 = _subtract_base(total_s5, bsp_s5_res, comp_need_s5)
 
 rows_comp_total = [
     ("Kompensation till slutkund för neutralisering", comp_need_s1, comp_need_s2, comp_need_s3, comp_need_s4, comp_need_s5, "EUR"),
@@ -835,12 +841,12 @@ df_comp_total = pd.DataFrame(
     ],
 )
 
-# Formattera
+# Formatera värdena
 for col in df_comp_total.columns[1:-1]:
     df_comp_total[col] = [_fmt_any(v, u) for v, u in zip(df_comp_total[col], df_comp_total["Enhet"])]
 
 st.dataframe(df_comp_total, use_container_width=True, height=200)
 st.caption(
-    "Kompensation = max(0, ‘Ökad totalkostnad slutkund’). "
-    "‘Aktörers resultat efter kompensation’ = (BRP+BSP+Elhandlare resultat) − kompensation."
+    "Om ‘BRP+BSP+Elhandlare resultat’ saknas används ‘BSP resultat’ som bas. "
+    "‘Aktörers resultat efter kompensation’ = (baserat resultat) − kompensation."
 )
