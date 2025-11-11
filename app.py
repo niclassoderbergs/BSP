@@ -141,66 +141,85 @@ def _sync_brb_copy_to_main(copy_key: str):
 
 
 
-
 # ---------- Scenariogenomgång (kompakt med expanders) ----------
 st.markdown("### Om scenarierna")
 
-with st.expander("Gemensamma antaganden (nedreglering)", expanded=False):
+with st.expander("Gemensamma antaganden (A/B)", expanded=False):
     st.markdown("""
-- **Nedreglering:** avser att slutkundens energiförbrukning **sänks** jämfört med den tilltänkta/planerade DA-förbrukningen.
+- **A = nedreglering** (förbrukningen sänks mot DA-plan), **B = uppreglering** (förbrukningen höjs mot DA-plan).
 - **Balanshandelstecken:** köp visas som **negativ** volym, sälj som **positiv**.
 - **Obalanskostnad:** beräknas med obalanspriset `P_IMB` på balanshandeln.
-- **Checkboxar styr flöden:**
-  - *BRP vidarefakturerar balanskostnader till elhandlare* – om ikryssad går balanskostnaden vidare till elhandlaren (RE).
+- **Checkboxar som kan påverka flöden och rader i tabeller:**
+  
+  - *BRP vidarefakturerar balanskostnader till elhandlare* – om ikryssad går BRP:s balanskostnad vidare till RE.
+  - *BSP köper in energi vid uppreglering* – om ikryssad bokas en DA-handel till `P_DA` för samtliga **B-scenarier** (uppreglering); extra rader visas i BSP-tabellen.
+  - *Tillämpa avdrag för BSP vid över/underleverans* – aktiverar avdrag baserat på differensen mellan aktiverad och budad volym (`E_akt` – `E_bud`) i BSP-tabellen.  
+    Under- eller överleverans ger ett avdrag enligt `P_PEN` om aktiverad.
+  - *Motsatt kompensation i 5b (RE → BSP)* – om ikryssad betalar RE kompensation till BSP i scenario 5b (default: ingen kompensation i 5b).
   - *Elhandlaren vidarefakturerar balanskostnader till slutkunden* – om ikryssad skickas BRP:s balansfaktura vidare på kundfakturan.
+  
+  
+  
+  
+  
+  
+  
     """)
 
-with st.expander("Scenario 1 – BRP = BSP, bud på nedreglering och **underleverans**", expanded=False):
+
+with st.expander("Scenario 1 – BRP = BSP, bud och **underleverans** (1a = ned, 1b = upp)", expanded=False):
     st.markdown("""
-- BRP/BSP lämnar bud `E_bud` på **nedreglering** (dvs sänkt förbrukning mot DA-plan).
-- Utfallet ger **underleverans** mot budet: faktisk nedreglering < budad nedreglering.
+- BRP/BSP lämnar bud `E_bud` på reglering.
+- Utfallet ger **underleverans** mot budet: faktisk aktivering < budad aktivering.
 - Obalansjusteringen i BRP-tabellen baseras på **`E_bud`**.
-- Avdrag för under/överleverans i BSP-tabellen kan aktiveras via checkboxen.
+- I BSP-tabellen kan avdrag för under/överleverans aktiveras via checkboxen *Tillämpa avdrag...*.
+- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **1b** (upp).
     """)
 
-with st.expander("Scenario 2 – BRP = BSP, bud på nedreglering och **överleverans**", expanded=False):
+with st.expander("Scenario 2 – BRP = BSP, bud och **överleverans** (2a = ned, 2b = upp)", expanded=False):
     st.markdown("""
-- Spegling av Scenario 1 men med **överleverans**: faktisk nedreglering > budad nedreglering.
+- Spegling av Scenario 1 men med **överleverans**: faktisk aktivering > budad aktivering.
 - Obalansjusteringen baseras på **`E_bud`**.
-- Eventuella avdrag hanteras som i Scenario 1.
+- Avdrag i BSP-tabellen hanteras som i Scenario 1.
+- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **2b** (upp).
     """)
 
-with st.expander("Scenario 3 – BRP = BSP, **uppmätt nedreglering**", expanded=False):
+with st.expander("Scenario 3 – BRP = BSP, **uppmätt aktivering** (3a = ned, 3b = upp)", expanded=False):
     st.markdown("""
 - BRP och BSP är samma aktör.
-- Obalansjusteringen baseras på **uppmätt nedreglering `E_akt`** (inte `E_bud`).
+- Obalansjusteringen baseras på **uppmätt aktivering `E_akt`** (inte `E_bud`).
 - Ingen separat kompensation mellan aktörer.
+- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **3b** (upp).
     """)
 
-with st.expander("Scenario 4 – BRP ≠ BSP, uppmätt nedreglering (**ingen kompensation**)", expanded=False):
+with st.expander("Scenario 4 – BRP ≠ BSP, uppmätt aktivering **utan kompensation** (4a = ned, 4b = upp)", expanded=False):
     st.markdown("""
 - BRP och BSP är **olika** aktörer.
-- Obalansjusteringen baseras på **uppmätt nedreglering `E_akt`**.
-- **Ingen kompensation** från BSP till elhandlaren (RE).
+- Obalansjusteringen baseras på **`E_akt`**.
+- **Ingen kompensation** mellan BSP och RE.
+- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **4b** (upp).
     """)
 
-with st.expander("Scenario 5 – BRP ≠ BSP, uppmätt nedreglering (**med kompensation**)", expanded=False):
+with st.expander("Scenario 5 – BRP ≠ BSP, uppmätt aktivering **med kompensation** (5a = ned, 5b = upp)", expanded=False):
     st.markdown("""
-- Som Scenario 4 men med **kompensation** från BSP till elhandlaren (RE) med pris **`P_RECOMP`** (default = `P_DA` om valt).
-- Kompensationen (kopplad till nedregleringsvolymen `E_akt`) minskar BSP:s resultat och påverkar RE:s resultat/kundpris beroende på checkboxen för vidarefakturering.
+- Baseras på **`E_akt`**.
+- **5a (ned):** BSP → RE (RE får kompensation) med pris **`P_RECOMP`**. *Denna kompensation är alltid aktiv i 5a.*
+- **5b (upp):** Default **ingen kompensation**. Om *Motsatt kompensation i 5b (RE → BSP)* är ikryssad betalar RE kompensation till BSP.
+- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **5b** (upp).
     """)
 
-with st.expander("Slutkundens elpris & tabeller (nedreglering)", expanded=False):
+with st.expander("Slutkundens elpris & tabeller", expanded=False):
     st.markdown("""
 - **Slutkundens elpris per MWh** i RE-tabellen:
   \n  `Pris = –(Inköp från BRP + ev. balans som skickas vidare + ev. kompensation) / fakturerad volym`
-- Tabellen **”Slutkundens elpris per scenario”** visar även avvikelse mot Scenario 5 samt **Ökad totalkostnad slutkund** (= prisavvikelse × fakturerad volym).
+- Tabellen **”Slutkundens elpris per scenario”** visar även avvikelse mot vald målkolumn (default 5a) samt **Ökad totalkostnad slutkund** (= prisavvikelse × fakturerad volym).
     """)
 
 with st.expander("Kompensation till slutkund (Tabell 6)", expanded=False):
     st.markdown("""
-- **Kompensation = max(0, Ökad totalkostnad slutkund)** per scenario för att neutralisera merkostnaden jämfört med Scenario 5.
+- **Kompensation = max(0, Ökad totalkostnad slutkund)** per scenario för att neutralisera merkostnaden mot målscenariot.
 - **Aktörers resultat efter kompensation** räknas från **BRP+BSP+Elhandlare resultat** (om ”NA” används **BSP resultat** som bas) minus kompensationen.
+- Om *Motsatt kompensation i 5b* är aktiverad påverkar detta resultaten i 5b innan neutraliseringskompensation beräknas.
     """)
 
 
@@ -307,8 +326,8 @@ E_cons_up   = 108.0
 # Nya: behåll uppmätt samma som i 1a/1b
 E_cons_1a = E_cons_down
 E_cons_1b = E_cons_up
-E_cons_2a = E_cons_down   # <-- inte speglad
-E_cons_2b = E_cons_up     # <-- 108 som du vill
+E_cons_2a = E_cons_down-4   # <-- inte speglad
+E_cons_2b = E_cons_up+4     # <-- 108 som du vill
 E_cons_3a = E_cons_down
 E_cons_3b = E_cons_up
 E_cons_4a = E_cons_down
@@ -432,6 +451,16 @@ st.dataframe(df_brp, use_container_width=True, height=620)
 
 
 
+
+# BSP köper in energi vid uppreglering (default: False)
+bsp_buy_up = st.checkbox(
+    "BSP köper in energi vid uppreglering",
+    value=False,
+    help="När ikryssad bokas en DA-handel till P_DA för uppregleringsscenarier (B)."
+)
+
+
+
 # ---------- Checkbox för avdrag på över/underleverans ----------
 apply_penalty = st.checkbox(
     "Tillämpa avdrag för BSP vid över/underleverans",
@@ -464,21 +493,15 @@ def _bsp_metrics(
     with_comp: bool,
     E_bud_x: float,
     E_akt_x: float,
-    comp_sign: int = -1,
-    is_up: bool = False,   # NYTT: riktning för visning
+    is_up: bool,                 # NYTT: True för uppreglering (B), False för ned (A)
+    comp_sign: int = -1
 ):
-    # 1) Basvolymer
-    vol_pay_raw = E_bud_x if pay_basis == "bud" else E_akt_x
-    vol_pay_abs = abs(vol_pay_raw)
-
-    # 2) Riktning för visning (a = ned => +, b = upp => −)
-    vol_pay_disp = -vol_pay_abs if is_up else vol_pay_abs
-
-    # 3) Ersättning baserat på absolut volym (alltid positiv intäkt)
+    # Ersättning (bud eller akt)
+    vol_pay   = E_bud_x if pay_basis == "bud" else E_akt_x
     price_pay = P_COMP
-    res_pay   = vol_pay_abs * price_pay
+    res_pay   = vol_pay * price_pay
 
-    # 4) Avdrag för under/överleverans (oförändrat)
+    # Under/överleverans (endast när baserat på bud)
     if pay_basis == "bud":
         vol_dev   = abs(E_akt_x - E_bud_x)
         price_dev = P_PEN if apply_penalty else 0.0
@@ -486,17 +509,27 @@ def _bsp_metrics(
     else:
         vol_dev = price_dev = res_dev = 0.0
 
-    # 5) Kompensation (volym alltid positiv; riktning via comp_sign)
+    # Kompensation BSP↔RE
     if with_comp:
-        vol_comp   = abs(E_akt_x)
+        vol_comp   = E_akt_x
         price_comp = P_RECOMP
         res_comp   = comp_sign * vol_comp * price_comp
     else:
         vol_comp = price_comp = res_comp = 0.0
 
-    res_netto = res_pay + res_dev + res_comp
+    # **NYTT**: DA-handel vid uppreglering (endast om checkbox är ikryssad och scenario är B)
+    if is_up and bsp_buy_up:
+        da_vol   = E_akt_x           # använd faktisk aktiverad volym
+        da_price = P_DA
+        da_cost  = -(da_vol * da_price)   # kostnad för BSP => negativ
+    else:
+        da_vol = da_price = da_cost = 0.0
+
+    # Nettoresultat inkl. ev. DA-handel vid uppreglering
+    res_netto = res_pay + res_dev + res_comp + da_cost
+
     return {
-        "Budvolym/Aktiverad volym": vol_pay_disp,   # <-- visar riktning
+        "Budvolym/Aktiverad volym": vol_pay,
         "Ersättningspris": price_pay,
         "Ersättningsresultat": res_pay,
         "Under/överleveransvolym": vol_dev,
@@ -505,8 +538,15 @@ def _bsp_metrics(
         "Kompensationsvolym": vol_comp,
         "Kompensationspris": price_comp,
         "Kompensationsresultat": res_comp,
+
+        # NYA fält
+        "DA handel vid uppreglering": da_vol,
+        "DA pris": da_price,
+        "Kostnad DA handel": da_cost,
+
         "BSP nettoresultat": res_netto,
     }
+
 
 
 
@@ -545,8 +585,15 @@ rows_bsp = [
     ("Kompensationsvolym",         bsp_1a["Kompensationsvolym"],        bsp_1b["Kompensationsvolym"],        bsp_2a["Kompensationsvolym"],        bsp_2b["Kompensationsvolym"],        bsp_3a["Kompensationsvolym"],        bsp_3b["Kompensationsvolym"],        bsp_4a["Kompensationsvolym"],        bsp_4b["Kompensationsvolym"],        bsp_5a["Kompensationsvolym"],        bsp_5b["Kompensationsvolym"],        "MWh"),
     ("Kompensationspris",          bsp_1a["Kompensationspris"],         bsp_1b["Kompensationspris"],         bsp_2a["Kompensationspris"],         bsp_2b["Kompensationspris"],         bsp_3a["Kompensationspris"],         bsp_3b["Kompensationspris"],         bsp_4a["Kompensationspris"],         bsp_4b["Kompensationspris"],         bsp_5a["Kompensationspris"],         bsp_5b["Kompensationspris"],         "€/MWh"),
     ("Kompensationsresultat",      bsp_1a["Kompensationsresultat"],     bsp_1b["Kompensationsresultat"],     bsp_2a["Kompensationsresultat"],     bsp_2b["Kompensationsresultat"],     bsp_3a["Kompensationsresultat"],     bsp_3b["Kompensationsresultat"],     bsp_4a["Kompensationsresultat"],     bsp_4b["Kompensationsresultat"],     bsp_5a["Kompensationsresultat"],     bsp_5b["Kompensationsresultat"],     "EUR"),
+
+    # Nya rader
+    ("DA handel vid uppreglering", bsp_1a["DA handel vid uppreglering"], bsp_1b["DA handel vid uppreglering"], bsp_2a["DA handel vid uppreglering"], bsp_2b["DA handel vid uppreglering"], bsp_3a["DA handel vid uppreglering"], bsp_3b["DA handel vid uppreglering"], bsp_4a["DA handel vid uppreglering"], bsp_4b["DA handel vid uppreglering"], bsp_5a["DA handel vid uppreglering"], bsp_5b["DA handel vid uppreglering"], "MWh"),
+    ("DA pris",                    bsp_1a["DA pris"],                    bsp_1b["DA pris"],                    bsp_2a["DA pris"],                    bsp_2b["DA pris"],                    bsp_3a["DA pris"],                    bsp_3b["DA pris"],                    bsp_4a["DA pris"],                    bsp_4b["DA pris"],                    bsp_5a["DA pris"],                    bsp_5b["DA pris"],                    "€/MWh"),
+    ("Kostnad DA handel",          bsp_1a["Kostnad DA handel"],          bsp_1b["Kostnad DA handel"],          bsp_2a["Kostnad DA handel"],          bsp_2b["Kostnad DA handel"],          bsp_3a["Kostnad DA handel"],          bsp_3b["Kostnad DA handel"],          bsp_4a["Kostnad DA handel"],          bsp_4b["Kostnad DA handel"],          bsp_5a["Kostnad DA handel"],          bsp_5b["Kostnad DA handel"],          "EUR"),
+
     ("BSP nettoresultat",          bsp_1a["BSP nettoresultat"],         bsp_1b["BSP nettoresultat"],         bsp_2a["BSP nettoresultat"],         bsp_2b["BSP nettoresultat"],         bsp_3a["BSP nettoresultat"],         bsp_3b["BSP nettoresultat"],         bsp_4a["BSP nettoresultat"],         bsp_4b["BSP nettoresultat"],         bsp_5a["BSP nettoresultat"],         bsp_5b["BSP nettoresultat"],         "EUR"),
 ]
+
 
 columns_bsp = [
     "Fält", 
