@@ -146,13 +146,13 @@ st.markdown("### Om scenarierna")
 
 with st.expander("Gemensamma antaganden (A/B)", expanded=False):
     st.markdown("""
-- **A = nedreglering** (förbrukningen sänks mot DA-plan), **B = uppreglering** (förbrukningen höjs mot DA-plan).
+- **A = uppreglering** (förbrukningen sänks mot DA-plan), **B = nedreglering** (förbrukningen höjs mot DA-plan).
 - **Balanshandelstecken:** köp visas som **negativ** volym, sälj som **positiv**.
 - **Obalanskostnad:** beräknas med obalanspriset `P_IMB` på balanshandeln.
 - **Checkboxar som kan påverka flöden och rader i tabeller:**
   
   - *BRP vidarefakturerar balanskostnader till elhandlare* – om ikryssad går BRP:s balanskostnad vidare till RE.
-  - *BSP köper in energi vid uppreglering* – om ikryssad bokas en DA-handel till `P_DA` för samtliga **B-scenarier** (uppreglering); extra rader visas i BSP-tabellen.
+  - *BSP köper in energi vid nedreglering* – om ikryssad bokas en DA-handel till `P_DA` för samtliga **B-scenarier** (nedreglering); extra rader visas i BSP-tabellen.
   - *Tillämpa avdrag för BSP vid över/underleverans* – aktiverar avdrag baserat på differensen mellan aktiverad och budad volym (`E_akt` – `E_bud`) i BSP-tabellen.  
     Under- eller överleverans ger ett avdrag enligt `P_PEN` om aktiverad.
   - *Motsatt kompensation i 5b (RE → BSP)* – om ikryssad betalar RE kompensation till BSP i scenario 5b (default: ingen kompensation i 5b).
@@ -167,50 +167,50 @@ with st.expander("Gemensamma antaganden (A/B)", expanded=False):
     """)
 
 
-with st.expander("Scenario 1 – BRP = BSP, bud och **underleverans** (1a = ned, 1b = upp)", expanded=False):
+with st.expander("Scenario 1 – BRP = BSP, bud och **underleverans** (1a = upp, 1b = ned)", expanded=False):
     st.markdown("""
 - BRP/BSP lämnar bud `E_bud` på reglering.
 - Utfallet ger **underleverans** mot budet: faktisk aktivering < budad aktivering.
 - Obalansjusteringen i BRP-tabellen baseras på **`E_bud`**.
 - I BSP-tabellen kan avdrag för under/överleverans aktiveras via checkboxen *Tillämpa avdrag...*.
-- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **1b** (upp).
+- Om *BSP köper in energi vid nedreglering* är ikryssad visas DA-rader i **1b** (ned).
     """)
 
-with st.expander("Scenario 2 – BRP = BSP, bud och **överleverans** (2a = ned, 2b = upp)", expanded=False):
+with st.expander("Scenario 2 – BRP = BSP, bud och **överleverans** (2a = upp, 2b = ned)", expanded=False):
     st.markdown("""
 - Spegling av Scenario 1 men med **överleverans**: faktisk aktivering > budad aktivering.
 - Obalansjusteringen baseras på **`E_bud`**.
 - Avdrag i BSP-tabellen hanteras som i Scenario 1.
-- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **2b** (upp).
+- Om *BSP köper in energi vid nedreglering* är ikryssad visas DA-rader i **2b** (ned).
     """)
 
-with st.expander("Scenario 3 – BRP = BSP, **uppmätt aktivering** (3a = ned, 3b = upp)", expanded=False):
+with st.expander("Scenario 3 – BRP = BSP, **uppmätt aktivering** (3a = upp, 3b = ned)", expanded=False):
     st.markdown("""
 - BRP och BSP är samma aktör.
 - Obalansjusteringen baseras på **uppmätt aktivering `E_akt`** (inte `E_bud`).
 - Ingen separat kompensation mellan aktörer.
-- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **3b** (upp).
+- Om *BSP köper in energi vid nedreglering* är ikryssad visas DA-rader i **3b** (ned).
     """)
 
-with st.expander("Scenario 4 – BRP ≠ BSP, uppmätt aktivering **utan kompensation** (4a = ned, 4b = upp)", expanded=False):
+with st.expander("Scenario 4 – BRP ≠ BSP, uppmätt aktivering **utan kompensation** (4a = upp, 4b = ned)", expanded=False):
     st.markdown("""
 - BRP och BSP är **olika** aktörer.
 - Obalansjusteringen baseras på **`E_akt`**.
 - **Ingen kompensation** mellan BSP och RE.
-- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **4b** (upp).
+- Om *BSP köper in energi vid ndereglering* är ikryssad visas DA-rader i **4b** (ned).
     """)
 
-with st.expander("Scenario 5 – BRP ≠ BSP, uppmätt aktivering **med kompensation** (5a = ned, 5b = upp)", expanded=False):
+with st.expander("Scenario 5 – BRP ≠ BSP, uppmätt aktivering **med kompensation** (5a = upp, 5b = ned)", expanded=False):
     st.markdown("""
 - Baseras på **`E_akt`**.
 - **5a (ned):** BSP → RE (RE får kompensation) med pris **`P_RECOMP`**. *Denna kompensation är alltid aktiv i 5a.*
-- **5b (upp):** Default **ingen kompensation**. Om *Motsatt kompensation i 5b (RE → BSP)* är ikryssad betalar RE kompensation till BSP.
-- Om *BSP köper in energi vid uppreglering* är ikryssad visas DA-rader i **5b** (upp).
+- **5b (ned):** Default **ingen kompensation**. Om *Motsatt kompensation i 5b (RE → BSP)* är ikryssad betalar RE kompensation till BSP.
+- Om *BSP köper in energi vid nedreglering* är ikryssad visas DA-rader i **5b** (ned).
     """)
 
 with st.expander("Slutkundens elpris & tabeller", expanded=False):
     st.markdown("""
-- **Slutkundens elpris per MWh** i RE-tabellen:
+- **Slutkundens elpris** i RE-tabellen:
   \n  `Pris = –(Inköp från BRP + ev. balans som skickas vidare + ev. kompensation) / fakturerad volym`
 - Tabellen **”Slutkundens elpris per scenario”** visar även avvikelse mot vald målkolumn (default 5a) samt **Ökad totalkostnad slutkund** (= prisavvikelse × fakturerad volym).
     """)
@@ -267,11 +267,11 @@ def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_u
     uppmatt_mwh: uppmätt förbrukning i scenariot
     obalans_vol_mwh: volym som ska obalansjusteras (E_bud eller E_akt)
     based_on: "Bud" eller "Uppmätt aktivering" (för utskrift)
-    is_up: True = uppreglering (vänd tecken), False = nedreglering
+    is_up: True = nedreglering (vänd tecken), False = uppreglering
     """
     handel_mwh = handel_sign * V_DA                      # köp = -, sälj = +
     kostnad_handel_eur = handel_mwh * P_DA
-    # VIKTIGT: vänd tecknet vid uppreglering
+    # VIKTIGT: vänd tecknet vid nedreglering
     obalansjust_mwh = -obalans_vol_mwh if is_up else obalans_vol_mwh
 
     summa_avr_balans_mwh = handel_mwh + obalansjust_mwh
@@ -290,7 +290,7 @@ def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_u
     )
 
     return {
-        "Obalansjusteras baserat på": f"{based_on} ({'upp' if is_up else 'ned'})",
+        "Obalansjusteras baserat på": f"{based_on} ({'ned' if is_up else 'upp'})",
         "Handel": handel_mwh,
         "DA Pris": P_DA,
         "Kostnad handel": kostnad_handel_eur,
@@ -430,16 +430,16 @@ df_brp = pd.DataFrame(
     rows_brp,
     columns=[
         "Fält",
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
         "Enhet",
     ],
 )
@@ -452,9 +452,9 @@ st.dataframe(df_brp, use_container_width=True, height=620)
 
 
 
-# BSP köper in energi vid uppreglering (default: False)
+# BSP köper in energi vid nedreglering (default: False)
 bsp_buy_up = st.checkbox(
-    "BSP köper in energi vid uppreglering",
+    "BSP köper in energi vid nedreglering",
     value=False,
     help="När ikryssad bokas en DA-handel till P_DA för uppregleringsscenarier (B)."
 )
@@ -493,15 +493,16 @@ def _bsp_metrics(
     with_comp: bool,
     E_bud_x: float,
     E_akt_x: float,
-    is_up: bool,                 # NYTT: True för uppreglering (B), False för ned (A)
+    is_up: bool,                 # True = B-scenario (ned), False = A-scenario (upp)
     comp_sign: int = -1
 ):
-    # Ersättning (bud eller akt)
-    vol_pay   = E_bud_x if pay_basis == "bud" else E_akt_x
+    # 1) Ersättning (bud eller akt)
+    raw_vol_pay = E_bud_x if pay_basis == "bud" else E_akt_x      # "äkta" volym för beräkning
+    disp_vol_pay = -raw_vol_pay if is_up else raw_vol_pay         # visningsvolym: minus i B
     price_pay = P_COMP
-    res_pay   = vol_pay * price_pay
+    res_pay   = abs(raw_vol_pay) * price_pay                      # resultat baserat på absolut volym
 
-    # Under/överleverans (endast när baserat på bud)
+    # 2) Under/överleverans (endast när baserat på bud)
     if pay_basis == "bud":
         vol_dev   = abs(E_akt_x - E_bud_x)
         price_dev = P_PEN if apply_penalty else 0.0
@@ -509,7 +510,7 @@ def _bsp_metrics(
     else:
         vol_dev = price_dev = res_dev = 0.0
 
-    # Kompensation BSP↔RE
+    # 3) Kompensation BSP↔RE
     if with_comp:
         vol_comp   = E_akt_x
         price_comp = P_RECOMP
@@ -517,21 +518,21 @@ def _bsp_metrics(
     else:
         vol_comp = price_comp = res_comp = 0.0
 
-    # **NYTT**: DA-handel vid uppreglering (endast om checkbox är ikryssad och scenario är B)
+    # 4) DA-handel vid nedreglering (endast om checkbox ikryssad och scenario är B)
     if is_up and bsp_buy_up:
-        da_vol   = E_akt_x           # använd faktisk aktiverad volym
+        da_vol   = E_akt_x
         da_price = P_DA
         da_cost  = -(da_vol * da_price)   # kostnad för BSP => negativ
     else:
         da_vol = da_price = da_cost = 0.0
 
-    # Nettoresultat inkl. ev. DA-handel vid uppreglering
+    # 5) Nettoresultat
     res_netto = res_pay + res_dev + res_comp + da_cost
 
     return {
-        "Budvolym/Aktiverad volym": vol_pay,
+        "Budvolym/Aktiverad volym": disp_vol_pay,   # visar minus i B
         "Ersättningspris": price_pay,
-        "Ersättningsresultat": res_pay,
+        "Ersättningsresultat": res_pay,            # absolutvolym
         "Under/överleveransvolym": vol_dev,
         "Under/överleveranspris": price_dev,
         "Under/överleveransresultat": res_dev,
@@ -539,8 +540,7 @@ def _bsp_metrics(
         "Kompensationspris": price_comp,
         "Kompensationsresultat": res_comp,
 
-        # NYA fält
-        "DA handel vid uppreglering": da_vol,
+        "DA handel vid nedreglering": da_vol,
         "DA pris": da_price,
         "Kostnad DA handel": da_cost,
 
@@ -587,7 +587,7 @@ rows_bsp = [
     ("Kompensationsresultat",      bsp_1a["Kompensationsresultat"],     bsp_1b["Kompensationsresultat"],     bsp_2a["Kompensationsresultat"],     bsp_2b["Kompensationsresultat"],     bsp_3a["Kompensationsresultat"],     bsp_3b["Kompensationsresultat"],     bsp_4a["Kompensationsresultat"],     bsp_4b["Kompensationsresultat"],     bsp_5a["Kompensationsresultat"],     bsp_5b["Kompensationsresultat"],     "EUR"),
 
     # Nya rader
-    ("DA handel vid uppreglering", bsp_1a["DA handel vid uppreglering"], bsp_1b["DA handel vid uppreglering"], bsp_2a["DA handel vid uppreglering"], bsp_2b["DA handel vid uppreglering"], bsp_3a["DA handel vid uppreglering"], bsp_3b["DA handel vid uppreglering"], bsp_4a["DA handel vid uppreglering"], bsp_4b["DA handel vid uppreglering"], bsp_5a["DA handel vid uppreglering"], bsp_5b["DA handel vid uppreglering"], "MWh"),
+    ("DA handel vid nedreglering", bsp_1a["DA handel vid nedreglering"], bsp_1b["DA handel vid nedreglering"], bsp_2a["DA handel vid nedreglering"], bsp_2b["DA handel vid nedreglering"], bsp_3a["DA handel vid nedreglering"], bsp_3b["DA handel vid nedreglering"], bsp_4a["DA handel vid nedreglering"], bsp_4b["DA handel vid nedreglering"], bsp_5a["DA handel vid nedreglering"], bsp_5b["DA handel vid nedreglering"], "MWh"),
     ("DA pris",                    bsp_1a["DA pris"],                    bsp_1b["DA pris"],                    bsp_2a["DA pris"],                    bsp_2b["DA pris"],                    bsp_3a["DA pris"],                    bsp_3b["DA pris"],                    bsp_4a["DA pris"],                    bsp_4b["DA pris"],                    bsp_5a["DA pris"],                    bsp_5b["DA pris"],                    "€/MWh"),
     ("Kostnad DA handel",          bsp_1a["Kostnad DA handel"],          bsp_1b["Kostnad DA handel"],          bsp_2a["Kostnad DA handel"],          bsp_2b["Kostnad DA handel"],          bsp_3a["Kostnad DA handel"],          bsp_3b["Kostnad DA handel"],          bsp_4a["Kostnad DA handel"],          bsp_4b["Kostnad DA handel"],          bsp_5a["Kostnad DA handel"],          bsp_5b["Kostnad DA handel"],          "EUR"),
 
@@ -597,16 +597,16 @@ rows_bsp = [
 
 columns_bsp = [
     "Fält", 
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
     "Enhet",
 ]
 
@@ -656,7 +656,13 @@ re_forward_balance_costs = st.checkbox(
 re_forward_balance_costs = st.session_state["re_forward_balance_costs"]
 
 
-
+# ---------- Checkbox: Elhandlaren använder DA pris som slutkundspris ----------
+use_da_price = st.checkbox(
+    "Använd DA pris som slutkundens elpris",
+    value=False,
+    key="use_da_price",
+    help="När ikryssad sätts slutkundens elpris = P_DA istället för att räknas från kostnad/volym."
+)
 
 
 
@@ -673,35 +679,70 @@ def _re_metrics_v4(
     re_sign: int = +1,  # +1 = RE får från BSP, -1 = RE betalar BSP
 ):
     re_forward_balance_costs = st.session_state.get("re_forward_balance_costs", True)
+    use_da_as_customer_price = st.session_state.get("use_da_as_customer_price", False)
 
+    # BRP → RE
     re_inkop_eur = -abs(m_brp["Handel"]) * P_DA
     re_balansfakt_eur = -m_brp["Obalanskostnad som faktureras"] if brp_forward_balance_costs else 0.0
 
-    # kompensation
+    # Kompensation (RE ↔ BSP)
     re_comp_vol_mwh = obalansjust_mwh if with_comp else 0.0
-    re_comp_eur = re_sign * re_comp_vol_mwh * P_RECOMP   # + = RE får (intäkt), − = RE betalar (kostnad)
+    re_comp_eur = re_sign * re_comp_vol_mwh * P_RECOMP   # + intäkt för RE / − kostnad för RE
 
+    # Vad skickas vidare till kund?
     balans_till_kund_eur = re_balansfakt_eur if re_forward_balance_costs else 0.0
+
+    # Total kostnad som ska faktureras (belopp, ej pris)
     re_kostnad_att_fakturera_eur = -(re_inkop_eur + balans_till_kund_eur + re_comp_eur)
 
+    # Volym till kund
     re_cust_vol_mwh = e_cons
-    slutkund_elpris_per_mwh = (re_kostnad_att_fakturera_eur / re_cust_vol_mwh) if re_cust_vol_mwh else 0.0
+
+    # Pris till kund: antingen kostnadsbaserat snittpris eller P_DA om checkbox
+    if re_cust_vol_mwh:
+        pris_kund_kostnadsbas = re_kostnad_att_fakturera_eur / re_cust_vol_mwh
+    else:
+        pris_kund_kostnadsbas = 0.0
+
+ # (NYTT) Slutkundens elpris: använd DA-pris om checkboxen är ikryssad
+    if st.session_state.get("use_da_price", False):
+        slutkund_elpris_per_mwh = P_DA
+    else:
+        slutkund_elpris_per_mwh = (re_kostnad_att_fakturera_eur / re_cust_vol_mwh) if re_cust_vol_mwh else 0.0
+
+    # Kundens kostnad enligt valt pris
     re_cust_cost_eur = re_cust_vol_mwh * slutkund_elpris_per_mwh
 
+    # RE:s resultat
     re_net_eur = re_inkop_eur + re_balansfakt_eur + re_comp_eur + re_cust_cost_eur
+
+    # (NYTT) Snittpris för inköp el som kan faktureras
+    vol_att_fakturera = re_cust_vol_mwh
+    snittpris_inkop = (re_kostnad_att_fakturera_eur / vol_att_fakturera) if vol_att_fakturera else 0.0
 
     return {
         "Inköpt el fakturerad av BRP": re_inkop_eur,
         "Balanskostnad fakturerad av BRP": re_balansfakt_eur,
         "Kompensationsvolym för flexibilitet": re_comp_vol_mwh,
         "Kompensationsbelopp": re_comp_eur,  # + intäkt för RE / − kostnad för RE
-        "Kostnad att fakturera kunden": re_kostnad_att_fakturera_eur,
-        "Volym som faktureras slutkund": re_cust_vol_mwh,
-        "Slutkundens elpris per MWh": slutkund_elpris_per_mwh,
+
+        # (NYTT namn) – var tidigare "Kostnad att fakturera kunden"
+        "Kostnad att fakturera slutkunden": re_kostnad_att_fakturera_eur,
+
+        # (NY etikett för visningen i tabellen)
+        "Volym att fakturera kunden": vol_att_fakturera,
+
+        # (NY rad) – beräknad enligt krav
+        "Snittpris för inköp el som kan faktureras": snittpris_inkop,
+
+        "Slutkundens elpris": slutkund_elpris_per_mwh,
         "Kostnad som faktureras slutkund": re_cust_cost_eur,
+
+        # Bakåtkompabilitet (används på andra ställen i koden)
+        "Volym som faktureras slutkund": re_cust_vol_mwh,
+
         "Resultat": re_net_eur,
     }
-
 
 
 # --- Definiera scenarier 1a–5b ---
@@ -727,12 +768,16 @@ re_row_specs = [
     ("Balanskostnad fakturerad av BRP", "EUR"),
     ("Kompensationsvolym för flexibilitet", "MWh"),
     ("Kompensationsbelopp", "EUR"),
-    ("Kostnad att fakturera kunden", "EUR"),
-    ("Volym som faktureras slutkund", "MWh"),
-    ("Slutkundens elpris per MWh", "€/MWh"),
+    ("Kostnad att fakturera slutkunden", "EUR"),
+    ("Volym att fakturera kunden", "MWh"),                      # ny etikett
+    ("Snittpris för inköp el som kan faktureras", "€/MWh"),     # flyttad rad + nytt namn
+    ("Slutkundens elpris", "€/MWh"),
     ("Kostnad som faktureras slutkund", "EUR"),
     ("Resultat", "EUR"),
 ]
+
+
+
 
 rows_re = []
 for f, unit in re_row_specs:
@@ -748,16 +793,16 @@ for f, unit in re_row_specs:
 
 df_re = pd.DataFrame(rows_re, columns=[
     "Fält",
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
     "Enhet",
 ])
 
@@ -890,16 +935,16 @@ df_sum = pd.DataFrame(
     rows_sum,
     columns=[
         "Fält",
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
         "Enhet",
     ],
 )
@@ -939,8 +984,9 @@ st.markdown("## Slutkundens elpris per scenario")
 
 # Pris per scenario (hämtat från RE-tabellen), A/B
 def _price_from_re(re_row: dict) -> float:
-    vol = re_row["Volym som faktureras slutkund"]
-    return (re_row["Kostnad som faktureras slutkund"] / vol) if vol else 0.0
+    # Läs direkt från RE-tabellen så checkboxen "Använd DA pris…" får effekt
+    return re_row["Slutkundens elpris"]
+
 
 price_1a = _price_from_re(re_1a); price_1b = _price_from_re(re_1b)
 price_2a = _price_from_re(re_2a); price_2b = _price_from_re(re_2b)
@@ -1001,7 +1047,7 @@ rows_cust = [
         "€/MWh",
     ),
     (
-        "Målresultat för slutkunds elpris (Scenario 5a – Slutkundens elpris per MWh)",
+        "Målresultat för slutkunds elpris (Scenario 5a – Slutkundens elpris)",
         goal_price_value, goal_price_value, goal_price_value, goal_price_value, goal_price_value,
         goal_price_value, goal_price_value, goal_price_value, goal_price_value, goal_price_value,
         "€/MWh",
@@ -1022,16 +1068,16 @@ df_cust = pd.DataFrame(
     rows_cust,
     columns=[
         "Fält",
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
         "Enhet",
     ],
 )
@@ -1118,16 +1164,16 @@ df_comp_total = pd.DataFrame(
     rows_comp_total,
     columns=[
         "Fält",
-        "1a BRP=BSP, Ned – Bud/underlev.",
-        "1b BRP=BSP, Upp – Bud/underlev.",
-        "2a BRP=BSP, Ned – Bud/överlev.",
-        "2b BRP=BSP, Upp – Bud/överlev.",
-        "3a BRP=BSP, Ned – Uppmätt akt.",
-        "3b BRP=BSP, Upp – Uppmätt akt.",
-        "4a BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Ned – Uppmätt (med komp)",
-        "5b BRP≠BSP, Upp – Uppmätt (med komp)",
+        "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
         "Enhet",
     ],
 )
@@ -1139,4 +1185,74 @@ st.dataframe(df_comp_total, use_container_width=True, height=220)
 st.caption(
     "Neutralisering = prisavvikelse × volym. Om ‘omvänd neutralisering’ är ikryssad kan beloppet vara negativt (kunden betalar tillbaka)."
 )
+
+
+# ---------- Export: Excel med alla tabeller ----------
+from io import BytesIO
+from datetime import datetime
+import pandas as pd
+
+def _to_excel_sheets(sheets: dict) -> BytesIO:
+    output = BytesIO()
+    try:
+        # Försök använda XlsxWriter om det finns
+        writer_engine = "xlsxwriter"
+        import xlsxwriter
+    except ImportError:
+        # Annars använd openpyxl
+        writer_engine = "openpyxl"
+
+    with pd.ExcelWriter(output, engine=writer_engine) as writer:
+        for sheet_name, df in sheets.items():
+            safe_name = sheet_name[:31]
+            df.to_excel(writer, index=False, sheet_name=safe_name)
+
+            # Autofit fungerar bara om XlsxWriter används
+            if writer_engine == "xlsxwriter":
+                ws = writer.sheets[safe_name]
+                for col_idx, col in enumerate(df.columns):
+                    try:
+                        max_len = max(
+                            len(str(col)),
+                            int(df[col].astype(str).str.len().max() or 0)
+                        )
+                    except Exception:
+                        max_len = len(str(col))
+                    ws.set_column(col_idx, col_idx, min(50, max(12, max_len + 2)))
+
+    output.seek(0)
+    return output
+
+
+# Samla alla dina DataFrames här:
+sheets = {
+    "BRP": df_brp,
+    "BSP": df_bsp,
+    "RE": df_re,
+    "Sammanställning": df_sum,
+    "Slutkundens elpris": df_cust,
+    "Kompensation": df_comp_total,
+}
+
+excel_bytes = _to_excel_sheets(sheets)
+
+st.download_button(
+    label="📥 Exportera Excel (alla tabeller)",
+    data=excel_bytes,
+    file_name=f"scenarios_{datetime.now().strftime('%Y-%m-%d_%H%M')}.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    help="Laddar ner en Excel-fil med ett blad per tabell."
+)
+
+
+
+
+
+
+
+
+
+
+
+
 
