@@ -223,6 +223,38 @@ with st.expander("Kompensation till slutkund (Tabell 6)", expanded=False):
     """)
 
 
+# ---------- Scenario-val: Visa scenarier i tabellerna ----------
+with st.expander("Visa scenarier i tabellerna", expanded=False):
+    st.markdown(
+        """
+Markera vilka scenarier som ska visas i tabellerna nedan.
+Om du avmarkerar ett scenarie döljs det i samtliga tabeller (BRP, BSP, RE, resultat, slutkund, kompensation).
+        """
+    )
+
+    BRP_SCENARIO_COLUMNS = {
+        "1a": "1a BRP=BSP, Upp – Bud/underlev.",
+        "1b": "1b BRP=BSP, Ned – Bud/underlev.",
+        "2a": "2a BRP=BSP, Upp – Bud/överlev.",
+        "2b": "2b BRP=BSP, Ned – Bud/överlev.",
+        "3a": "3a BRP=BSP, Upp – Uppmätt akt.",
+        "3b": "3b BRP=BSP, Ned – Uppmätt akt.",
+        "4a": "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+        "4b": "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+        "5a": "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+        "5b": "5b BRP≠BSP, Ned – Uppmätt (med komp)",
+    }
+
+    # En checkbox per scenario – alla ikryssade som default
+    cols = st.columns(5)  # bara layout/kosmetik
+    for i, (short_key, label) in enumerate(BRP_SCENARIO_COLUMNS.items()):
+        with cols[i % 5]:
+            st.checkbox(
+                label,
+                value=True,
+                key=f"show_brp_{short_key}",
+                help=f"Visa/dölj scenario {short_key} i alla tabeller.",
+            )
 
 
 # ---------- Checkbox före BRP-tabellen ----------
@@ -232,6 +264,10 @@ brp_forward_balance_costs = st.checkbox(
     key="brp_forward_balance_costs",   # <-- huvudnyckeln
     help="Om urkryssad står BRP själv för balanskostnaden och fakturerar inte elhandlaren."
 )
+
+
+
+
 
 
 
@@ -478,6 +514,7 @@ for col in df_brp.columns[1:-1]:
     df_brp[col] = [_fmt_cell(v, e) for v, e in zip(df_brp[col], df_brp["Enhet"])]
 
 # ----- Rad-tooltips: text till varje "Fält" -----
+# ----- Rad-tooltips: text till varje "Fält" -----
 brp_row_tips = {
     "Obalansjusteras baserat på":
         "Visar om obalansjusteringen görs mot bud (E_bud) eller uppmätt aktivering (E_akt), samt riktning: upp eller ned.",
@@ -509,13 +546,26 @@ brp_row_tips = {
         "BRP:s resultat: Kostnad handel + Balanskostnad BRP + Inköpt el som faktureras + Obalanskostnad som faktureras. Enhet: EUR.",
 }
 
-# Bygg en tooltip-matris i samma form som df_brp, men fyll bara kolumnen "Fält"
+# Bygg tooltip-matris i samma form som df_brp (alla kolumner, innan filtrering)
 tooltips = pd.DataFrame("", index=df_brp.index, columns=df_brp.columns)
 for i, field in enumerate(df_brp["Fält"]):
     tooltips.iloc[i, 0] = brp_row_tips.get(field, "")
 
-# Skapa Styler med tooltips
-styled_brp = df_brp.style.set_tooltips(tooltips)
+# --------- NYTT: filtrera kolumner utifrån scenario-checkboxar ---------
+visible_scenario_cols = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+# Se till att alltid ha Fält + Enhet kvar
+ordered_cols = ["Fält", *visible_scenario_cols, "Enhet"]
+
+df_brp_visible = df_brp[ordered_cols]
+tooltips_visible = tooltips[ordered_cols]
+
+# Skapa Styler med tooltips för den filtrerade tabellen
+styled_brp = df_brp_visible.style.set_tooltips(tooltips_visible)
 
 # ----- Visa BRP-tabellen med hover-tooltips på första kolumnen -----
 st.table(styled_brp)
@@ -806,11 +856,26 @@ tooltips_bsp = pd.DataFrame("", index=df_bsp.index, columns=df_bsp.columns)
 for i, field in enumerate(df_bsp["Fält"]):
     tooltips_bsp.iloc[i, 0] = bsp_row_tips.get(field, "")
 
+# --------- NYTT: filtrera kolumner utifrån scenario-checkboxar ---------
+# Vi återanvänder samma BRP_SCENARIO_COLUMNS som för BRP-tabellen
+visible_scenario_cols = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+# Se till att alltid ha Fält + Enhet kvar
+ordered_cols_bsp = ["Fält", *visible_scenario_cols, "Enhet"]
+
+df_bsp_visible = df_bsp[ordered_cols_bsp]
+tooltips_bsp_visible = tooltips_bsp[ordered_cols_bsp]
+
 # Skapa Styler med tooltips
-styled_bsp = df_bsp.style.set_tooltips(tooltips_bsp)
+styled_bsp = df_bsp_visible.style.set_tooltips(tooltips_bsp_visible)
 
 # Visa tabellen med hover-tooltips på kolumnen "Fält"
 st.table(styled_bsp)
+
 
 
 
@@ -1031,11 +1096,26 @@ tooltips_re = pd.DataFrame("", index=df_re.index, columns=df_re.columns)
 for i, field in enumerate(df_re["Fält"]):
     tooltips_re.iloc[i, 0] = re_row_tips.get(field, "")
 
+# --------- NYTT: filtrera kolumner utifrån scenario-checkboxar ---------
+# Vi återanvänder samma BRP_SCENARIO_COLUMNS som för BRP- och BSP-tabellerna
+visible_scenario_cols_re = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+# Se till att alltid ha Fält + Enhet kvar
+ordered_cols_re = ["Fält", *visible_scenario_cols_re, "Enhet"]
+
+df_re_visible = df_re[ordered_cols_re]
+tooltips_re_visible = tooltips_re[ordered_cols_re]
+
 # Skapa Styler med tooltips
-styled_re = df_re.style.set_tooltips(tooltips_re)
+styled_re = df_re_visible.style.set_tooltips(tooltips_re_visible)
 
 # Visa tabellen med hover-tooltips på kolumnen "Fält"
 st.table(styled_re)
+
 
 
 
@@ -1203,9 +1283,27 @@ tooltips_sum = pd.DataFrame("", index=df_sum.index, columns=df_sum.columns)
 for i, field in enumerate(df_sum["Fält"]):
     tooltips_sum.iloc[i, 0] = sum_row_tips.get(field, "")
 
-styled_sum = df_sum.style.set_tooltips(tooltips_sum)
+# ------- Scenario-kolumnfiltrering (samma logik som Tabell 1–3) -------
 
-# Visa tabellen med hover-tooltips på kolumnen "Fält"
+# BRP_SCENARIO_COLUMNS är samma dict som används av BRP/BSP/RE:
+# { "1a": "1a BRP=BSP, Upp – Bud/underlev.",  ... }
+
+visible_scenario_cols_sum = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+# Nya kolumnordningen
+ordered_cols_sum = ["Fält", *visible_scenario_cols_sum, "Enhet"]
+
+df_sum_visible = df_sum[ordered_cols_sum]
+tooltips_sum_visible = tooltips_sum[ordered_cols_sum]
+
+# ------- Skapa styler med tooltips -------
+styled_sum = df_sum_visible.style.set_tooltips(tooltips_sum_visible)
+
+# ------- Visa tabellen -------
 st.table(styled_sum)
 
 
@@ -1342,14 +1440,25 @@ tooltips_cust = pd.DataFrame("", index=df_cust.index, columns=df_cust.columns)
 for i, field in enumerate(df_cust["Fält"]):
     tooltips_cust.iloc[i, 0] = cust_row_tips.get(field, "")
 
-styled_cust = df_cust.style.set_tooltips(tooltips_cust)
+# -------- Scenario-kolumnfiltrering för Tabell 5 --------
+# Använder samma BRP_SCENARIO_COLUMNS och show_brp_* som övriga tabeller
 
-# Visa tabellen med hover-tooltips på kolumnen "Fält"
+visible_scenario_cols_cust = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+ordered_cols_cust = ["Fält", *visible_scenario_cols_cust, "Enhet"]
+
+df_cust_visible = df_cust[ordered_cols_cust]
+tooltips_cust_visible = tooltips_cust[ordered_cols_cust]
+
+# Skapa Styler med tooltips på "Fält"-kolumnen
+styled_cust = df_cust_visible.style.set_tooltips(tooltips_cust_visible)
+
+# Visa tabellen
 st.table(styled_cust)
-
-st.caption(
-    "‘Ökad totalkostnad slutkund’ beräknas som (Avvikelse slutkundens elpris × volym som faktureras slutkund) per scenario."
-)
 
 # Tillåt omvänd neutralisering till/från slutkund
 allow_reverse_neutral = st.checkbox(
@@ -1461,7 +1570,19 @@ tooltips_comp_total = pd.DataFrame("", index=df_comp_total.index, columns=df_com
 for i, field in enumerate(df_comp_total["Fält"]):
     tooltips_comp_total.iloc[i, 0] = comp_row_tips.get(field, "")
 
-styled_comp_total = df_comp_total.style.set_tooltips(tooltips_comp_total)
+# -------- Scenario-kolumnfiltrering för Tabell 6 --------
+visible_scenario_cols_comp = [
+    full_label
+    for short_key, full_label in BRP_SCENARIO_COLUMNS.items()
+    if st.session_state.get(f"show_brp_{short_key}", True)
+]
+
+ordered_cols_comp = ["Fält", *visible_scenario_cols_comp, "Enhet"]
+
+df_comp_total_visible = df_comp_total[ordered_cols_comp]
+tooltips_comp_total_visible = tooltips_comp_total[ordered_cols_comp]
+
+styled_comp_total = df_comp_total_visible.style.set_tooltips(tooltips_comp_total_visible)
 
 # Visa med hover-tooltips på kolumnen "Fält"
 st.table(styled_comp_total)
@@ -1469,6 +1590,7 @@ st.table(styled_comp_total)
 st.caption(
     "Neutralisering = prisavvikelse × volym. Om ‘omvänd neutralisering’ är ikryssad kan beloppet vara negativt (kunden betalar tillbaka)."
 )
+
 
 
 
