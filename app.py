@@ -241,11 +241,11 @@ def _wrap_header(h: str) -> str:
 
 
 
-
 # ---------- TABELL 1: BRP (1a,1b,2a,2b,3a,3b,4a,4b,5a,5b) ----------
 st.markdown("## BRP")
 
 def _fmt_cell(v, enhet):
+    """Formatering av visningsvärden i tabellen."""
     try:
         if enhet == "MWh":
             return f"{float(v):,.0f}"
@@ -253,13 +253,10 @@ def _fmt_cell(v, enhet):
             return f"{float(v):,.2f}"
         if enhet == "EUR":
             return f"{float(v):,.0f}"
-    except:
+    except Exception:
         return v
     return v
 
-
-
-# --- Lägg in detta block före rows_brp = [...] ---
 
 # ---- BRP: beräkningar och scenarier 1a–5b ----
 def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_up: bool):
@@ -269,11 +266,14 @@ def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_u
     based_on: "Bud" eller "Uppmätt aktivering" (för utskrift)
     is_up: True = nedreglering (vänd tecken), False = uppreglering
     """
-    handel_mwh = handel_sign * V_DA                      # köp = -, sälj = +
+    # DA-handel
+    handel_mwh = handel_sign * V_DA          # köp = -, sälj = +
     kostnad_handel_eur = handel_mwh * P_DA
-    # VIKTIGT: vänd tecknet vid nedreglering
+
+    # Vänd tecken på obalansjustering vid nedreglering
     obalansjust_mwh = -obalans_vol_mwh if is_up else obalans_vol_mwh
 
+    # Balansavräkning
     summa_avr_balans_mwh = handel_mwh + obalansjust_mwh
     obalans_mwh = uppmatt_mwh + summa_avr_balans_mwh
     balanshandel_mwh = -obalans_mwh
@@ -282,11 +282,16 @@ def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_u
     # Vidarefakturering?
     obalans_fakt_eur = 0.0 if not brp_forward_balance_costs else -balanskostnad_eur
 
+    # Fakturering till RE
     inkopt_el_fakt_eur = abs(handel_mwh) * P_DA
     brp_fakt_re_eur = inkopt_el_fakt_eur + obalans_fakt_eur
 
+    # BRP:s eget netto
     brp_netto_eur = (
-        kostnad_handel_eur + balanskostnad_eur + inkopt_el_fakt_eur + obalans_fakt_eur
+        kostnad_handel_eur
+        + balanskostnad_eur
+        + inkopt_el_fakt_eur
+        + obalans_fakt_eur
     )
 
     return {
@@ -306,28 +311,21 @@ def _brp_metrics(uppmatt_mwh: float, obalans_vol_mwh: float, based_on: str, is_u
         "BRP nettokostnad": brp_netto_eur,
     }
 
-# ---- Parametrar för A (ned) och B (upp) enligt dina värden ----
-# --- Ta bort speglingen (behåll gärna variablerna för tydlighet) ---
 
-E_bud_down = E_bud
-E_bud_up   = 10.0
+# ---- Parametrar för A (ned) och B (upp) enligt dina värden ----
+E_bud_down = E_bud          # ned-scenarier
+E_bud_up   = 10.0           # upp-scenarier
 E_akt_down = E_akt
 E_akt_up   = 8.0
 
 E_cons_down = E_cons
 E_cons_up   = 108.0
 
-# Gamla (ta bort eller kommentera):
-# S_down = (handel_sign * V_DA) + E_bud_down
-# S_up   = (handel_sign * V_DA) + E_bud_up
-# E_cons_2a = -E_cons_down - 2 * S_down
-# E_cons_2b = -E_cons_up   - 2 * S_up
-
-# Nya: behåll uppmätt samma som i 1a/1b
+# Uppmätt förbrukning per scenario (som du ville ha dem)
 E_cons_1a = E_cons_down
 E_cons_1b = E_cons_up
-E_cons_2a = E_cons_down-4   # <-- inte speglad
-E_cons_2b = E_cons_up+4     # <-- 108 som du vill
+E_cons_2a = E_cons_down - 4
+E_cons_2b = E_cons_up + 4
 E_cons_3a = E_cons_down
 E_cons_3b = E_cons_up
 E_cons_4a = E_cons_down
@@ -335,95 +333,126 @@ E_cons_4b = E_cons_up
 E_cons_5a = E_cons_down
 E_cons_5b = E_cons_up
 
+# Beräkna 10 BRP-scenarier
+m1a = _brp_metrics(E_cons_1a, E_bud_down, "Bud",                is_up=False)  # 1a Upp
+m1b = _brp_metrics(E_cons_1b, E_bud_up,   "Bud",                is_up=True)   # 1b Ned
 
-# Beräkna 10 BRP-scenarier med korrekt riktning på obalansjusteringen
-m1a = _brp_metrics(E_cons_1a, E_bud_down, "Bud",               is_up=False)
-m1b = _brp_metrics(E_cons_1b, E_bud_up,   "Bud",               is_up=True)
+m2a = _brp_metrics(E_cons_2a, E_bud_down, "Bud",                is_up=False)  # 2a Upp
+m2b = _brp_metrics(E_cons_2b, E_bud_up,   "Bud",                is_up=True)   # 2b Ned
 
-m2a = _brp_metrics(E_cons_2a, E_bud_down, "Bud",               is_up=False)
-m2b = _brp_metrics(E_cons_2b, E_bud_up,   "Bud",               is_up=True)
+m3a = _brp_metrics(E_cons_3a, E_akt_down, "Uppmätt aktivering", is_up=False)  # 3a Upp
+m3b = _brp_metrics(E_cons_3b, E_akt_up,   "Uppmätt aktivering", is_up=True)   # 3b Ned
 
-m3a = _brp_metrics(E_cons_3a, E_akt_down, "Uppmätt aktivering", is_up=False)
-m3b = _brp_metrics(E_cons_3b, E_akt_up,   "Uppmätt aktivering", is_up=True)
+m4a = _brp_metrics(E_cons_4a, E_akt_down, "Uppmätt aktivering", is_up=False)  # 4a Upp
+m4b = _brp_metrics(E_cons_4b, E_akt_up,   "Uppmätt aktivering", is_up=True)   # 4b Ned
 
-m4a = _brp_metrics(E_cons_4a, E_akt_down, "Uppmätt aktivering", is_up=False)
-m4b = _brp_metrics(E_cons_4b, E_akt_up,   "Uppmätt aktivering", is_up=True)
+m5a = _brp_metrics(E_cons_5a, E_akt_down, "Uppmätt aktivering", is_up=False)  # 5a Upp
+m5b = _brp_metrics(E_cons_5b, E_akt_up,   "Uppmätt aktivering", is_up=True)   # 5b Ned
 
-m5a = _brp_metrics(E_cons_5a, E_akt_down, "Uppmätt aktivering", is_up=False)
-m5b = _brp_metrics(E_cons_5b, E_akt_up,   "Uppmätt aktivering", is_up=True)
-
-# (Tillfälliga alias för att resten av appen fortfarande använder m1..m5)
+# (Alias om resten av appen fortfarande använder m1..m5)
 m1, m2, m3, m4, m5 = m1a, m2a, m3a, m4a, m5a
 
 
-
-
-
-
-
-
-
+# ----- Bygg BRP-DataFrame -----
 rows_brp = [
-    ("Obalansjusteras baserat på",
-     m1a["Obalansjusteras baserat på"], m1b["Obalansjusteras baserat på"],
-     m2a["Obalansjusteras baserat på"], m1b["Obalansjusteras baserat på"],
-     m3a["Obalansjusteras baserat på"], m3b["Obalansjusteras baserat på"],
-     m4a["Obalansjusteras baserat på"], m4b["Obalansjusteras baserat på"],
-     m5a["Obalansjusteras baserat på"], m5b["Obalansjusteras baserat på"], ""),
-    ("Handel",
-     m1a["Handel"], m1b["Handel"], m2a["Handel"], m2b["Handel"],
-     m3a["Handel"], m3b["Handel"], m4a["Handel"], m4b["Handel"],
-     m5a["Handel"], m5b["Handel"], "MWh"),
-    ("DA Pris",
-     m1a["DA Pris"], m1b["DA Pris"], m2a["DA Pris"], m2b["DA Pris"],
-     m3a["DA Pris"], m3b["DA Pris"], m4a["DA Pris"], m4b["DA Pris"],
-     m5a["DA Pris"], m5b["DA Pris"], "€/MWh"),
-    ("Kostnad handel",
-     m1a["Kostnad handel"], m1b["Kostnad handel"], m2a["Kostnad handel"], m2b["Kostnad handel"],
-     m3a["Kostnad handel"], m3b["Kostnad handel"], m4a["Kostnad handel"], m4b["Kostnad handel"],
-     m5a["Kostnad handel"], m5b["Kostnad handel"], "EUR"),
-    ("Obalansjustering",
-     m1a["Obalansjustering"], m1b["Obalansjustering"], m2a["Obalansjustering"], m2b["Obalansjustering"],
-     m3a["Obalansjustering"], m3b["Obalansjustering"], m4a["Obalansjustering"], m4b["Obalansjustering"],
-     m5a["Obalansjustering"], m5b["Obalansjustering"], "MWh"),
-    ("Summa avräknas i balans",
-     m1a["Summa avräknas i balans"], m1b["Summa avräknas i balans"], m2a["Summa avräknas i balans"], m2b["Summa avräknas i balans"],
-     m3a["Summa avräknas i balans"], m3b["Summa avräknas i balans"], m4a["Summa avräknas i balans"], m4b["Summa avräknas i balans"],
-     m5a["Summa avräknas i balans"], m5b["Summa avräknas i balans"], "MWh"),
-    ("Uppmätt",
-     m1a["Uppmätt"], m1b["Uppmätt"], m2a["Uppmätt"], m2b["Uppmätt"],
-     m3a["Uppmätt"], m3b["Uppmätt"], m4a["Uppmätt"], m4b["Uppmätt"],
-     m5a["Uppmätt"], m5b["Uppmätt"], "MWh"),
-    ("Balanshandel (köp − / sälj +)",
-     m1a["Balanshandel (köp − / sälj +)"], m1b["Balanshandel (köp − / sälj +)"],
-     m2a["Balanshandel (köp − / sälj +)"], m2b["Balanshandel (köp − / sälj +)"],
-     m3a["Balanshandel (köp − / sälj +)"], m3b["Balanshandel (köp − / sälj +)"],
-     m4a["Balanshandel (köp − / sälj +)"], m4b["Balanshandel (köp − / sälj +)"],
-     m5a["Balanshandel (köp − / sälj +)"], m5b["Balanshandel (köp − / sälj +)"], "MWh"),
-    ("Obalanspris",
-     m1a["Obalanspris"], m1b["Obalanspris"], m2a["Obalanspris"], m2b["Obalanspris"],
-     m3a["Obalanspris"], m3b["Obalanspris"], m4a["Obalanspris"], m4b["Obalanspris"],
-     m5a["Obalanspris"], m5b["Obalanspris"], "€/MWh"),
-    ("Balanskostnad BRP",
-     m1a["Balanskostnad BRP"], m1b["Balanskostnad BRP"], m2a["Balanskostnad BRP"], m2b["Balanskostnad BRP"],
-     m3a["Balanskostnad BRP"], m3b["Balanskostnad BRP"], m4a["Balanskostnad BRP"], m4b["Balanskostnad BRP"],
-     m5a["Balanskostnad BRP"], m5b["Balanskostnad BRP"], "EUR"),
-    ("Inköpt el som faktureras",
-     m1a["Inköpt el som faktureras"], m1b["Inköpt el som faktureras"], m2a["Inköpt el som faktureras"], m2b["Inköpt el som faktureras"],
-     m3a["Inköpt el som faktureras"], m3b["Inköpt el som faktureras"], m4a["Inköpt el som faktureras"], m4b["Inköpt el som faktureras"],
-     m5a["Inköpt el som faktureras"], m5b["Inköpt el som faktureras"], "EUR"),
-    ("Obalanskostnad som faktureras",
-     m1a["Obalanskostnad som faktureras"], m1b["Obalanskostnad som faktureras"], m2a["Obalanskostnad som faktureras"], m2b["Obalanskostnad som faktureras"],
-     m3a["Obalanskostnad som faktureras"], m3b["Obalanskostnad som faktureras"], m4a["Obalanskostnad som faktureras"], m4b["Obalanskostnad som faktureras"],
-     m5a["Obalanskostnad som faktureras"], m5b["Obalanskostnad som faktureras"], "EUR"),
-    ("BRP fakturerar elhandlare",
-     m1a["BRP fakturerar elhandlare"], m1b["BRP fakturerar elhandlare"], m2a["BRP fakturerar elhandlare"], m2b["BRP fakturerar elhandlare"],
-     m3a["BRP fakturerar elhandlare"], m3b["BRP fakturerar elhandlare"], m4a["BRP fakturerar elhandlare"], m4b["BRP fakturerar elhandlare"],
-     m5a["BRP fakturerar elhandlare"], m5b["BRP fakturerar elhandlare"], "EUR"),
-    ("BRP nettokostnad",
-     m1a["BRP nettokostnad"], m1b["BRP nettokostnad"], m2a["BRP nettokostnad"], m2b["BRP nettokostnad"],
-     m3a["BRP nettokostnad"], m3b["BRP nettokostnad"], m4a["BRP nettokostnad"], m4b["BRP nettokostnad"],
-     m5a["BRP nettokostnad"], m5b["BRP nettokostnad"], "EUR"),
+    (
+        "Obalansjusteras baserat på",
+        m1a["Obalansjusteras baserat på"], m1b["Obalansjusteras baserat på"],
+        m2a["Obalansjusteras baserat på"], m2b["Obalansjusteras baserat på"],
+        m3a["Obalansjusteras baserat på"], m3b["Obalansjusteras baserat på"],
+        m4a["Obalansjusteras baserat på"], m4b["Obalansjusteras baserat på"],
+        m5a["Obalansjusteras baserat på"], m5b["Obalansjusteras baserat på"], "",
+    ),
+    (
+        "Handel",
+        m1a["Handel"], m1b["Handel"], m2a["Handel"], m2b["Handel"],
+        m3a["Handel"], m3b["Handel"], m4a["Handel"], m4b["Handel"],
+        m5a["Handel"], m5b["Handel"], "MWh",
+    ),
+    (
+        "DA Pris",
+        m1a["DA Pris"], m1b["DA Pris"], m2a["DA Pris"], m2b["DA Pris"],
+        m3a["DA Pris"], m3b["DA Pris"], m4a["DA Pris"], m4b["DA Pris"],
+        m5a["DA Pris"], m5b["DA Pris"], "€/MWh",
+    ),
+    (
+        "Kostnad handel",
+        m1a["Kostnad handel"], m1b["Kostnad handel"], m2a["Kostnad handel"], m2b["Kostnad handel"],
+        m3a["Kostnad handel"], m3b["Kostnad handel"], m4a["Kostnad handel"], m4b["Kostnad handel"],
+        m5a["Kostnad handel"], m5b["Kostnad handel"], "EUR",
+    ),
+    (
+        "Obalansjustering",
+        m1a["Obalansjustering"], m1b["Obalansjustering"], m2a["Obalansjustering"], m2b["Obalansjustering"],
+        m3a["Obalansjustering"], m3b["Obalansjustering"], m4a["Obalansjustering"], m4b["Obalansjustering"],
+        m5a["Obalansjustering"], m5b["Obalansjustering"], "MWh",
+    ),
+    (
+        "Summa avräknas i balans",
+        m1a["Summa avräknas i balans"], m1b["Summa avräknas i balans"],
+        m2a["Summa avräknas i balans"], m2b["Summa avräknas i balans"],
+        m3a["Summa avräknas i balans"], m3b["Summa avräknas i balans"],
+        m4a["Summa avräknas i balans"], m4b["Summa avräknas i balans"],
+        m5a["Summa avräknas i balans"], m5b["Summa avräknas i balans"], "MWh",
+    ),
+    (
+        "Uppmätt",
+        m1a["Uppmätt"], m1b["Uppmätt"], m2a["Uppmätt"], m2b["Uppmätt"],
+        m3a["Uppmätt"], m3b["Uppmätt"], m4a["Uppmätt"], m4b["Uppmätt"],
+        m5a["Uppmätt"], m5b["Uppmätt"], "MWh",
+    ),
+    (
+        "Balanshandel (köp − / sälj +)",
+        m1a["Balanshandel (köp − / sälj +)"], m1b["Balanshandel (köp − / sälj +)"],
+        m2a["Balanshandel (köp − / sälj +)"], m2b["Balanshandel (köp − / sälj +)"],
+        m3a["Balanshandel (köp − / sälj +)"], m3b["Balanshandel (köp − / sälj +)"],
+        m4a["Balanshandel (köp − / sälj +)"], m4b["Balanshandel (köp − / sälj +)"],
+        m5a["Balanshandel (köp − / sälj +)"], m5b["Balanshandel (köp − / sälj +)"], "MWh",
+    ),
+    (
+        "Obalanspris",
+        m1a["Obalanspris"], m1b["Obalanspris"], m2a["Obalanspris"], m2b["Obalanspris"],
+        m3a["Obalanspris"], m3b["Obalanspris"], m4a["Obalanspris"], m4b["Obalanspris"],
+        m5a["Obalanspris"], m5b["Obalanspris"], "€/MWh",
+    ),
+    (
+        "Balanskostnad BRP",
+        m1a["Balanskostnad BRP"], m1b["Balanskostnad BRP"], m2a["Balanskostnad BRP"], m2b["Balanskostnad BRP"],
+        m3a["Balanskostnad BRP"], m3b["Balanskostnad BRP"], m4a["Balanskostnad BRP"], m4b["Balanskostnad BRP"],
+        m5a["Balanskostnad BRP"], m5b["Balanskostnad BRP"], "EUR",
+    ),
+    (
+        "Inköpt el som faktureras",
+        m1a["Inköpt el som faktureras"], m1b["Inköpt el som faktureras"],
+        m2a["Inköpt el som faktureras"], m2b["Inköpt el som faktureras"],
+        m3a["Inköpt el som faktureras"], m3b["Inköpt el som faktureras"],
+        m4a["Inköpt el som faktureras"], m4b["Inköpt el som faktureras"],
+        m5a["Inköpt el som faktureras"], m5b["Inköpt el som faktureras"], "EUR",
+    ),
+    (
+        "Obalanskostnad som faktureras",
+        m1a["Obalanskostnad som faktureras"], m1b["Obalanskostnad som faktureras"],
+        m2a["Obalanskostnad som faktureras"], m2b["Obalanskostnad som faktureras"],
+        m3a["Obalanskostnad som faktureras"], m3b["Obalanskostnad som faktureras"],
+        m4a["Obalanskostnad som faktureras"], m4b["Obalanskostnad som faktureras"],
+        m5a["Obalanskostnad som faktureras"], m5b["Obalanskostnad som faktureras"], "EUR",
+    ),
+    (
+        "BRP fakturerar elhandlare",
+        m1a["BRP fakturerar elhandlare"], m1b["BRP fakturerar elhandlare"],
+        m2a["BRP fakturerar elhandlare"], m2b["BRP fakturerar elhandlare"],
+        m3a["BRP fakturerar elhandlare"], m3b["BRP fakturerar elhandlare"],
+        m4a["BRP fakturerar elhandlare"], m4b["BRP fakturerar elhandlare"],
+        m5a["BRP fakturerar elhandlare"], m5b["BRP fakturerar elhandlare"], "EUR",
+    ),
+    (
+        "BRP nettokostnad",
+        m1a["BRP nettokostnad"], m1b["BRP nettokostnad"],
+        m2a["BRP nettokostnad"], m2b["BRP nettokostnad"],
+        m3a["BRP nettokostnad"], m3b["BRP nettokostnad"],
+        m4a["BRP nettokostnad"], m4b["BRP nettokostnad"],
+        m5a["BRP nettokostnad"], m5b["BRP nettokostnad"], "EUR",
+    ),
 ]
 
 df_brp = pd.DataFrame(
@@ -444,10 +473,53 @@ df_brp = pd.DataFrame(
     ],
 )
 
+# Formatera värdena (siffror → strängar med rätt antal decimaler)
 for col in df_brp.columns[1:-1]:
     df_brp[col] = [_fmt_cell(v, e) for v, e in zip(df_brp[col], df_brp["Enhet"])]
 
-st.dataframe(df_brp, use_container_width=True, height=620)
+# ----- Rad-tooltips: text till varje "Fält" -----
+brp_row_tips = {
+    "Obalansjusteras baserat på":
+        "Visar om obalansjusteringen görs mot bud (E_bud) eller uppmätt aktivering (E_akt), samt riktning: upp eller ned.",
+    "Handel":
+        "DA-handeln mot marknaden: handel_sign × V_DA (köp = negativ, sälj = positiv). Enhet: MWh.",
+    "DA Pris":
+        "Day-Ahead-priset P_DA som används för DA-handeln. Enhet: €/MWh.",
+    "Kostnad handel":
+        "Kostnad/intäkt för DA-handeln: Handel × P_DA. Enhet: EUR.",
+    "Obalansjustering":
+        "Volym som justeras i balansavräkningen (E_bud eller E_akt; tecken vänds i ned-scenarier). Enhet: MWh.",
+    "Summa avräknas i balans":
+        "Handel + Obalansjustering. Summan som går in i balansavräkningen. Enhet: MWh.",
+    "Uppmätt":
+        "Uppmätt förbrukning i scenariot (E_cons_x). Enhet: MWh.",
+    "Balanshandel (köp − / sälj +)":
+        "Motpost som balanserar mätning och avräknad handel: −(Uppmätt + Summa avräknas i balans). Enhet: MWh.",
+    "Obalanspris":
+        "Obalanspris P_IMB som används för balanshandeln. Enhet: €/MWh.",
+    "Balanskostnad BRP":
+        "Kostnad/intäkt för balanshandeln: Balanshandel × P_IMB. Enhet: EUR.",
+    "Inköpt el som faktureras":
+        "Belopp för DA-inköp som BRP fakturerar elhandlaren: |Handel| × P_DA. Enhet: EUR.",
+    "Obalanskostnad som faktureras":
+        "Den del av BRP:s balanskostnad som faktureras vidare till elhandlaren (styrt av checkboxen). Enhet: EUR.",
+    "BRP fakturerar elhandlare":
+        "Summa faktura till elhandlaren: Inköpt el som faktureras + Obalanskostnad som faktureras. Enhet: EUR.",
+    "BRP nettokostnad":
+        "BRP:s resultat: Kostnad handel + Balanskostnad BRP + Inköpt el som faktureras + Obalanskostnad som faktureras. Enhet: EUR.",
+}
+
+# Bygg en tooltip-matris i samma form som df_brp, men fyll bara kolumnen "Fält"
+tooltips = pd.DataFrame("", index=df_brp.index, columns=df_brp.columns)
+for i, field in enumerate(df_brp["Fält"]):
+    tooltips.iloc[i, 0] = brp_row_tips.get(field, "")
+
+# Skapa Styler med tooltips
+styled_brp = df_brp.style.set_tooltips(tooltips)
+
+# ----- Visa BRP-tabellen med hover-tooltips på första kolumnen -----
+st.table(styled_brp)
+
 
 
 
@@ -478,9 +550,6 @@ st.checkbox(
 )
 rev_comp_5b = st.session_state.get("rev_comp_5b", False)
 # >>> slut på nytt block <<<
-
-
-
 
 
 
@@ -548,14 +617,11 @@ def _bsp_metrics(
     }
 
 
-
-
 # A (ned) & B (upp)
 E_bud_down, E_bud_up   = E_bud, 10.0
 E_akt_down, E_akt_up   = E_akt, 8.0
 
-# 10 scenarier (1a–5b) – oförändrat för 1–4
-# 1–4 oförändrade i övrigt, men lägg till is_up
+# 10 scenarier (1a–5b)
 bsp_1a = _bsp_metrics("bud", False, E_bud_down, E_akt_down, is_up=False)
 bsp_1b = _bsp_metrics("bud", False, E_bud_up,   E_akt_up,   is_up=True)
 
@@ -576,62 +642,175 @@ bsp_5b = _bsp_metrics("akt", rev_comp_5b, E_bud_up, E_akt_up, comp_sign=+1, is_u
 
 
 rows_bsp = [
-    ("Budvolym/Aktiverad volym",   bsp_1a["Budvolym/Aktiverad volym"], bsp_1b["Budvolym/Aktiverad volym"], bsp_2a["Budvolym/Aktiverad volym"], bsp_2b["Budvolym/Aktiverad volym"], bsp_3a["Budvolym/Aktiverad volym"], bsp_3b["Budvolym/Aktiverad volym"], bsp_4a["Budvolym/Aktiverad volym"], bsp_4b["Budvolym/Aktiverad volym"], bsp_5a["Budvolym/Aktiverad volym"], bsp_5b["Budvolym/Aktiverad volym"], "MWh"),
-    ("Ersättningspris",            bsp_1a["Ersättningspris"],           bsp_1b["Ersättningspris"],           bsp_2a["Ersättningspris"],           bsp_2b["Ersättningspris"],           bsp_3a["Ersättningspris"],           bsp_3b["Ersättningspris"],           bsp_4a["Ersättningspris"],           bsp_4b["Ersättningspris"],           bsp_5a["Ersättningspris"],           bsp_5b["Ersättningspris"],           "€/MWh"),
-    ("Ersättningsresultat",        bsp_1a["Ersättningsresultat"],       bsp_1b["Ersättningsresultat"],       bsp_2a["Ersättningsresultat"],       bsp_2b["Ersättningsresultat"],       bsp_3a["Ersättningsresultat"],       bsp_3b["Ersättningsresultat"],       bsp_4a["Ersättningsresultat"],       bsp_4b["Ersättningsresultat"],       bsp_5a["Ersättningsresultat"],       bsp_5b["Ersättningsresultat"],       "EUR"),
-    ("Under/överleveransvolym",    bsp_1a["Under/överleveransvolym"],   bsp_1b["Under/överleveransvolym"],   bsp_2a["Under/överleveransvolym"],   bsp_2b["Under/överleveransvolym"],   bsp_3a["Under/överleveransvolym"],   bsp_3b["Under/överleveransvolym"],   bsp_4a["Under/överleveransvolym"],   bsp_4b["Under/överleveransvolym"],   bsp_5a["Under/överleveransvolym"],   bsp_5b["Under/överleveransvolym"],   "MWh"),
-    ("Under/överleveranspris",     bsp_1a["Under/överleveranspris"],    bsp_1b["Under/överleveranspris"],    bsp_2a["Under/överleveranspris"],    bsp_2b["Under/överleveranspris"],    bsp_3a["Under/överleveranspris"],    bsp_3b["Under/överleveranspris"],    bsp_4a["Under/överleveranspris"],    bsp_4b["Under/överleveranspris"],    bsp_5a["Under/överleveranspris"],    bsp_5b["Under/överleveranspris"],    "€/MWh"),
-    ("Under/överleveransresultat", bsp_1a["Under/överleveransresultat"],bsp_1b["Under/överleveransresultat"],bsp_2a["Under/överleveransresultat"],bsp_2b["Under/överleveransresultat"],bsp_3a["Under/överleveransresultat"],bsp_3b["Under/överleveransresultat"],bsp_4a["Under/överleveransresultat"],bsp_4b["Under/överleveransresultat"],bsp_5a["Under/överleveransresultat"],bsp_5b["Under/överleveransresultat"],"EUR"),
-    ("Kompensationsvolym",         bsp_1a["Kompensationsvolym"],        bsp_1b["Kompensationsvolym"],        bsp_2a["Kompensationsvolym"],        bsp_2b["Kompensationsvolym"],        bsp_3a["Kompensationsvolym"],        bsp_3b["Kompensationsvolym"],        bsp_4a["Kompensationsvolym"],        bsp_4b["Kompensationsvolym"],        bsp_5a["Kompensationsvolym"],        bsp_5b["Kompensationsvolym"],        "MWh"),
-    ("Kompensationspris",          bsp_1a["Kompensationspris"],         bsp_1b["Kompensationspris"],         bsp_2a["Kompensationspris"],         bsp_2b["Kompensationspris"],         bsp_3a["Kompensationspris"],         bsp_3b["Kompensationspris"],         bsp_4a["Kompensationspris"],         bsp_4b["Kompensationspris"],         bsp_5a["Kompensationspris"],         bsp_5b["Kompensationspris"],         "€/MWh"),
-    ("Kompensationsresultat",      bsp_1a["Kompensationsresultat"],     bsp_1b["Kompensationsresultat"],     bsp_2a["Kompensationsresultat"],     bsp_2b["Kompensationsresultat"],     bsp_3a["Kompensationsresultat"],     bsp_3b["Kompensationsresultat"],     bsp_4a["Kompensationsresultat"],     bsp_4b["Kompensationsresultat"],     bsp_5a["Kompensationsresultat"],     bsp_5b["Kompensationsresultat"],     "EUR"),
-
-    # Nya rader
-    ("DA handel vid nedreglering", bsp_1a["DA handel vid nedreglering"], bsp_1b["DA handel vid nedreglering"], bsp_2a["DA handel vid nedreglering"], bsp_2b["DA handel vid nedreglering"], bsp_3a["DA handel vid nedreglering"], bsp_3b["DA handel vid nedreglering"], bsp_4a["DA handel vid nedreglering"], bsp_4b["DA handel vid nedreglering"], bsp_5a["DA handel vid nedreglering"], bsp_5b["DA handel vid nedreglering"], "MWh"),
-    ("DA pris",                    bsp_1a["DA pris"],                    bsp_1b["DA pris"],                    bsp_2a["DA pris"],                    bsp_2b["DA pris"],                    bsp_3a["DA pris"],                    bsp_3b["DA pris"],                    bsp_4a["DA pris"],                    bsp_4b["DA pris"],                    bsp_5a["DA pris"],                    bsp_5b["DA pris"],                    "€/MWh"),
-    ("Kostnad DA handel",          bsp_1a["Kostnad DA handel"],          bsp_1b["Kostnad DA handel"],          bsp_2a["Kostnad DA handel"],          bsp_2b["Kostnad DA handel"],          bsp_3a["Kostnad DA handel"],          bsp_3b["Kostnad DA handel"],          bsp_4a["Kostnad DA handel"],          bsp_4b["Kostnad DA handel"],          bsp_5a["Kostnad DA handel"],          bsp_5b["Kostnad DA handel"],          "EUR"),
-
-    ("BSP nettoresultat",          bsp_1a["BSP nettoresultat"],         bsp_1b["BSP nettoresultat"],         bsp_2a["BSP nettoresultat"],         bsp_2b["BSP nettoresultat"],         bsp_3a["BSP nettoresultat"],         bsp_3b["BSP nettoresultat"],         bsp_4a["BSP nettoresultat"],         bsp_4b["BSP nettoresultat"],         bsp_5a["BSP nettoresultat"],         bsp_5b["BSP nettoresultat"],         "EUR"),
+    ("Budvolym/Aktiverad volym",
+        bsp_1a["Budvolym/Aktiverad volym"], bsp_1b["Budvolym/Aktiverad volym"],
+        bsp_2a["Budvolym/Aktiverad volym"], bsp_2b["Budvolym/Aktiverad volym"],
+        bsp_3a["Budvolym/Aktiverad volym"], bsp_3b["Budvolym/Aktiverad volym"],
+        bsp_4a["Budvolym/Aktiverad volym"], bsp_4b["Budvolym/Aktiverad volym"],
+        bsp_5a["Budvolym/Aktiverad volym"], bsp_5b["Budvolym/Aktiverad volym"], "MWh"
+    ),
+    ("Ersättningspris",
+        bsp_1a["Ersättningspris"], bsp_1b["Ersättningspris"],
+        bsp_2a["Ersättningspris"], bsp_2b["Ersättningspris"],
+        bsp_3a["Ersättningspris"], bsp_3b["Ersättningspris"],
+        bsp_4a["Ersättningspris"], bsp_4b["Ersättningspris"],
+        bsp_5a["Ersättningspris"], bsp_5b["Ersättningspris"], "€/MWh"
+    ),
+    ("Ersättningsresultat",
+        bsp_1a["Ersättningsresultat"], bsp_1b["Ersättningsresultat"],
+        bsp_2a["Ersättningsresultat"], bsp_2b["Ersättningsresultat"],
+        bsp_3a["Ersättningsresultat"], bsp_3b["Ersättningsresultat"],
+        bsp_4a["Ersättningsresultat"], bsp_4b["Ersättningsresultat"],
+        bsp_5a["Ersättningsresultat"], bsp_5b["Ersättningsresultat"], "EUR"
+    ),
+    ("Under/överleveransvolym",
+        bsp_1a["Under/överleveransvolym"], bsp_1b["Under/överleveransvolym"],
+        bsp_2a["Under/överleveransvolym"], bsp_2b["Under/överleveransvolym"],
+        bsp_3a["Under/överleveransvolym"], bsp_3b["Under/överleveransvolym"],
+        bsp_4a["Under/överleveransvolym"], bsp_4b["Under/överleveransvolym"],
+        bsp_5a["Under/överleveransvolym"], bsp_5b["Under/överleveransvolym"], "MWh"
+    ),
+    ("Under/överleveranspris",
+        bsp_1a["Under/överleveranspris"], bsp_1b["Under/överleveranspris"],
+        bsp_2a["Under/överleveranspris"], bsp_2b["Under/överleveranspris"],
+        bsp_3a["Under/överleveranspris"], bsp_3b["Under/överleveranspris"],
+        bsp_4a["Under/överleveranspris"], bsp_4b["Under/överleveranspris"],
+        bsp_5a["Under/överleveranspris"], bsp_5b["Under/överleveranspris"], "€/MWh"
+    ),
+    ("Under/överleveransresultat",
+        bsp_1a["Under/överleveransresultat"], bsp_1b["Under/överleveransresultat"],
+        bsp_2a["Under/överleveransresultat"], bsp_2b["Under/överleveransresultat"],
+        bsp_3a["Under/överleveransresultat"], bsp_3b["Under/överleveransresultat"],
+        bsp_4a["Under/överleveransresultat"], bsp_4b["Under/överleveransresultat"],
+        bsp_5a["Under/överleveransresultat"], bsp_5b["Under/överleveransresultat"], "EUR"
+    ),
+    ("Kompensationsvolym",
+        bsp_1a["Kompensationsvolym"], bsp_1b["Kompensationsvolym"],
+        bsp_2a["Kompensationsvolym"], bsp_2b["Kompensationsvolym"],
+        bsp_3a["Kompensationsvolym"], bsp_3b["Kompensationsvolym"],
+        bsp_4a["Kompensationsvolym"], bsp_4b["Kompensationsvolym"],
+        bsp_5a["Kompensationsvolym"], bsp_5b["Kompensationsvolym"], "MWh"
+    ),
+    ("Kompensationspris",
+        bsp_1a["Kompensationspris"], bsp_1b["Kompensationspris"],
+        bsp_2a["Kompensationspris"], bsp_2b["Kompensationspris"],
+        bsp_3a["Kompensationspris"], bsp_3b["Kompensationspris"],
+        bsp_4a["Kompensationspris"], bsp_4b["Kompensationspris"],
+        bsp_5a["Kompensationspris"], bsp_5b["Kompensationspris"], "€/MWh"
+    ),
+    ("Kompensationsresultat",
+        bsp_1a["Kompensationsresultat"], bsp_1b["Kompensationsresultat"],
+        bsp_2a["Kompensationsresultat"], bsp_2b["Kompensationsresultat"],
+        bsp_3a["Kompensationsresultat"], bsp_3b["Kompensationsresultat"],
+        bsp_4a["Kompensationsresultat"], bsp_4b["Kompensationsresultat"],
+        bsp_5a["Kompensationsresultat"], bsp_5b["Kompensationsresultat"], "EUR"
+    ),
+    ("DA handel vid nedreglering",
+        bsp_1a["DA handel vid nedreglering"], bsp_1b["DA handel vid nedreglering"],
+        bsp_2a["DA handel vid nedreglering"], bsp_2b["DA handel vid nedreglering"],
+        bsp_3a["DA handel vid nedreglering"], bsp_3b["DA handel vid nedreglering"],
+        bsp_4a["DA handel vid nedreglering"], bsp_4b["DA handel vid nedreglering"],
+        bsp_5a["DA handel vid nedreglering"], bsp_5b["DA handel vid nedreglering"], "MWh"
+    ),
+    ("DA pris",
+        bsp_1a["DA pris"], bsp_1b["DA pris"],
+        bsp_2a["DA pris"], bsp_2b["DA pris"],
+        bsp_3a["DA pris"], bsp_3b["DA pris"],
+        bsp_4a["DA pris"], bsp_4b["DA pris"],
+        bsp_5a["DA pris"], bsp_5b["DA pris"], "€/MWh"
+    ),
+    ("Kostnad DA handel",
+        bsp_1a["Kostnad DA handel"], bsp_1b["Kostnad DA handel"],
+        bsp_2a["Kostnad DA handel"], bsp_2b["Kostnad DA handel"],
+        bsp_3a["Kostnad DA handel"], bsp_3b["Kostnad DA handel"],
+        bsp_4a["Kostnad DA handel"], bsp_4b["Kostnad DA handel"],
+        bsp_5a["Kostnad DA handel"], bsp_5b["Kostnad DA handel"], "EUR"
+    ),
+    ("BSP nettoresultat",
+        bsp_1a["BSP nettoresultat"], bsp_1b["BSP nettoresultat"],
+        bsp_2a["BSP nettoresultat"], bsp_2b["BSP nettoresultat"],
+        bsp_3a["BSP nettoresultat"], bsp_3b["BSP nettoresultat"],
+        bsp_4a["BSP nettoresultat"], bsp_4b["BSP nettoresultat"],
+        bsp_5a["BSP nettoresultat"], bsp_5b["BSP nettoresultat"], "EUR"
+    ),
 ]
 
 
 columns_bsp = [
-    "Fält", 
-        "1a BRP=BSP, Upp – Bud/underlev.",
-        "1b BRP=BSP, Ned – Bud/underlev.",
-        "2a BRP=BSP, Upp – Bud/överlev.",
-        "2b BRP=BSP, Ned – Bud/överlev.",
-        "3a BRP=BSP, Upp – Uppmätt akt.",
-        "3b BRP=BSP, Ned – Uppmätt akt.",
-        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
-        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
+    "Fält",
+    "1a BRP=BSP, Upp – Bud/underlev.",
+    "1b BRP=BSP, Ned – Bud/underlev.",
+    "2a BRP=BSP, Upp – Bud/överlev.",
+    "2b BRP=BSP, Ned – Bud/överlev.",
+    "3a BRP=BSP, Upp – Uppmätt akt.",
+    "3b BRP=BSP, Ned – Uppmätt akt.",
+    "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+    "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+    "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+    "5b BRP≠BSP, Ned – Uppmätt (med komp)",
     "Enhet",
 ]
 
 
-
-
-
-
 def _fmt_bsp(v, unit):
     try:
-        if unit == "MWh":   return f"{float(v):,.0f}"
-        if unit == "€/MWh": return f"{float(v):,.2f}"
-        if unit == "EUR":   return f"{float(v):,.0f}"
+        if unit == "MWh":
+            return f"{float(v):,.0f}"
+        if unit == "€/MWh":
+            return f"{float(v):,.2f}"
+        if unit == "EUR":
+            return f"{float(v):,.0f}"
     except Exception:
         return v
     return v
 
+
 df_bsp = pd.DataFrame(rows_bsp, columns=columns_bsp)
 
+# Formatera värden
 for col in df_bsp.columns[1:-1]:
     df_bsp[col] = [_fmt_bsp(v, u) for v, u in zip(df_bsp[col], df_bsp["Enhet"])]
 
-st.dataframe(df_bsp, use_container_width=True, height=570)
+# ---------- (NYTT) Tooltips för BSP-rader ----------
+bsp_row_tips = {
+    "Budvolym/Aktiverad volym":
+        "Volym som ersättning baseras på: E_bud (bud) eller E_akt (uppmätt). Negativ i B-scenarier (nedreglering).",
+    "Ersättningspris":
+        "Pris per MWh som BSP får för aktiveringen: P_COMP (alt. obalanspris om checkbox).",
+    "Ersättningsresultat":
+        "Intäkt baserad på ersättningsvolym: |Budvolym/Aktiverad volym| × Ersättningspris.",
+    "Under/överleveransvolym":
+        "Skillnad mellan uppmätt aktivering och budad volym: |E_akt − E_bud| (endast när ersättning baseras på bud).",
+    "Under/överleveranspris":
+        "Avdragspris P_PEN för över-/underleverans (0 om checkbox för avdrag ej ikryssad).",
+    "Under/överleveransresultat":
+        "Avdrag för över-/underleverans: − Under/överleveransvolym × Under/överleveranspris.",
+    "Kompensationsvolym":
+        "Volym som används för kompensation mellan BSP och RE (oftast E_akt i scen 5).",
+    "Kompensationspris":
+        "Pris för kompensation mellan BSP och RE: P_RECOMP.",
+    "Kompensationsresultat":
+        "Resultat av kompensationen: Kompensationsvolym × Kompensationspris × comp_sign (tecken beror på riktning).",
+    "DA handel vid nedreglering":
+        "Extra DA-handel BSP gör i ned-scenarier när checkboxen 'BSP köper in energi vid nedreglering' är ikryssad.",
+    "DA pris":
+        "DA-pris P_DA som används för köp/sälj i raden 'DA handel vid nedreglering'.",
+    "Kostnad DA handel":
+        "Kostnad/intäkt för DA-handel vid nedreglering: − DA handel × DA pris (negativt = kostnad).",
+    "BSP nettoresultat":
+        "Samlat resultat för BSP: Ersättningsresultat + Under/överleveransresultat + Kompensationsresultat + Kostnad DA handel.",
+}
 
+# Bygg tooltip-matris: samma form som df_bsp, men fyll bara första kolumnen
+tooltips_bsp = pd.DataFrame("", index=df_bsp.index, columns=df_bsp.columns)
+for i, field in enumerate(df_bsp["Fält"]):
+    tooltips_bsp.iloc[i, 0] = bsp_row_tips.get(field, "")
 
+# Skapa Styler med tooltips
+styled_bsp = df_bsp.style.set_tooltips(tooltips_bsp)
+
+# Visa tabellen med hover-tooltips på kolumnen "Fält"
+st.table(styled_bsp)
 
 
 
@@ -671,6 +850,7 @@ use_da_price = st.checkbox(
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1–5) ----------
 # ---------- TABELL 3: Elhandlare / RE (Scenario 1a–5b) ----------
 st.markdown("## RE")
+
 def _re_metrics_v4(
     m_brp: dict,
     e_cons: float,
@@ -698,17 +878,19 @@ def _re_metrics_v4(
     # Volym till kund
     re_cust_vol_mwh = e_cons
 
-    # Pris till kund: antingen kostnadsbaserat snittpris eller P_DA om checkbox
+    # Kostnadsbaserat snittpris (används om man inte låser till DA-pris)
     if re_cust_vol_mwh:
         pris_kund_kostnadsbas = re_kostnad_att_fakturera_eur / re_cust_vol_mwh
     else:
         pris_kund_kostnadsbas = 0.0
 
- # (NYTT) Slutkundens elpris: använd DA-pris om checkboxen är ikryssad
+    # (NYTT) Slutkundens elpris: använd DA-pris om checkboxen är ikryssad
     if st.session_state.get("use_da_price", False):
         slutkund_elpris_per_mwh = P_DA
     else:
-        slutkund_elpris_per_mwh = (re_kostnad_att_fakturera_eur / re_cust_vol_mwh) if re_cust_vol_mwh else 0.0
+        slutkund_elpris_per_mwh = (
+            re_kostnad_att_fakturera_eur / re_cust_vol_mwh
+        ) if re_cust_vol_mwh else 0.0
 
     # Kundens kostnad enligt valt pris
     re_cust_cost_eur = re_cust_vol_mwh * slutkund_elpris_per_mwh
@@ -718,7 +900,9 @@ def _re_metrics_v4(
 
     # (NYTT) Snittpris för inköp el som kan faktureras
     vol_att_fakturera = re_cust_vol_mwh
-    snittpris_inkop = (re_kostnad_att_fakturera_eur / vol_att_fakturera) if vol_att_fakturera else 0.0
+    snittpris_inkop = (
+        re_kostnad_att_fakturera_eur / vol_att_fakturera
+    ) if vol_att_fakturera else 0.0
 
     return {
         "Inköpt el fakturerad av BRP": re_inkop_eur,
@@ -732,13 +916,13 @@ def _re_metrics_v4(
         # (NY etikett för visningen i tabellen)
         "Volym att fakturera kunden": vol_att_fakturera,
 
-        # (NY rad) – beräknad enligt krav
+        # (NY rad)
         "Snittpris för inköp el som kan faktureras": snittpris_inkop,
 
         "Slutkundens elpris": slutkund_elpris_per_mwh,
         "Kostnad som faktureras slutkund": re_cust_cost_eur,
 
-        # Bakåtkompabilitet (används på andra ställen i koden)
+        # Bakåtkompatibilitet
         "Volym som faktureras slutkund": re_cust_vol_mwh,
 
         "Resultat": re_net_eur,
@@ -755,10 +939,10 @@ re_3b = _re_metrics_v4(m3b, E_cons_3b, E_akt_up,   with_comp=False)
 re_4a = _re_metrics_v4(m4a, E_cons_4a, E_akt_down, with_comp=False)
 re_4b = _re_metrics_v4(m4b, E_cons_4b, E_akt_up,   with_comp=False)
 
-# 5a: RE ska ALLTID få kompensation (BSP → RE) => with_comp=True, re_sign=+1 (positivt belopp)
+# 5a: RE ska ALLTID få kompensation (BSP → RE)
 re_5a = _re_metrics_v4(m5a, E_cons_5a, E_akt_down, with_comp=True,  re_sign=+1)
 
-# 5b: default ingen komp; om checkbox ✓ så betalar RE BSP => with_comp=True, re_sign=-1 (negativt belopp)
+# 5b: default ingen komp; om checkbox ✓ så betalar RE BSP
 re_5b = _re_metrics_v4(m5b, E_cons_5b, E_akt_up,   with_comp=rev_comp_5b, re_sign=-1)
 
 
@@ -769,15 +953,12 @@ re_row_specs = [
     ("Kompensationsvolym för flexibilitet", "MWh"),
     ("Kompensationsbelopp", "EUR"),
     ("Kostnad att fakturera slutkunden", "EUR"),
-    ("Volym att fakturera kunden", "MWh"),                      # ny etikett
-    ("Snittpris för inköp el som kan faktureras", "€/MWh"),     # flyttad rad + nytt namn
+    ("Volym att fakturera kunden", "MWh"),
+    ("Snittpris för inköp el som kan faktureras", "€/MWh"),
     ("Slutkundens elpris", "€/MWh"),
     ("Kostnad som faktureras slutkund", "EUR"),
     ("Resultat", "EUR"),
 ]
-
-
-
 
 rows_re = []
 for f, unit in re_row_specs:
@@ -793,16 +974,16 @@ for f, unit in re_row_specs:
 
 df_re = pd.DataFrame(rows_re, columns=[
     "Fält",
-        "1a BRP=BSP, Upp – Bud/underlev.",
-        "1b BRP=BSP, Ned – Bud/underlev.",
-        "2a BRP=BSP, Upp – Bud/överlev.",
-        "2b BRP=BSP, Ned – Bud/överlev.",
-        "3a BRP=BSP, Upp – Uppmätt akt.",
-        "3b BRP=BSP, Ned – Uppmätt akt.",
-        "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
-        "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
-        "5a BRP≠BSP, Upp – Uppmätt (med komp)",
-        "5b BRP≠BSP, Ned – Uppmätt (med komp)",
+    "1a BRP=BSP, Upp – Bud/underlev.",
+    "1b BRP=BSP, Ned – Bud/underlev.",
+    "2a BRP=BSP, Upp – Bud/överlev.",
+    "2b BRP=BSP, Ned – Bud/överlev.",
+    "3a BRP=BSP, Upp – Uppmätt akt.",
+    "3b BRP=BSP, Ned – Uppmätt akt.",
+    "4a BRP≠BSP, Upp – Uppmätt (ingen komp)",
+    "4b BRP≠BSP, Ned – Uppmätt (ingen komp)",
+    "5a BRP≠BSP, Upp – Uppmätt (med komp)",
+    "5b BRP≠BSP, Ned – Uppmätt (med komp)",
     "Enhet",
 ])
 
@@ -814,14 +995,47 @@ def _fmt_re(v, e):
             return f"{float(v):,.2f}"
         if e == "EUR":
             return f"{float(v):,.0f}"
-    except:
+    except Exception:
         return v
     return v
 
 for col in df_re.columns[1:-1]:
     df_re[col] = [_fmt_re(v, e) for v, e in zip(df_re[col], df_re["Enhet"])]
 
-st.dataframe(df_re, use_container_width=True, height=420)
+# ---------- (NYTT) Tooltips för RE-rader ----------
+re_row_tips = {
+    "Inköpt el fakturerad av BRP":
+        "RE:s kostnad för el som köps från BRP: −|Handel| × P_DA. Negativt värde = kostnad.",
+    "Balanskostnad fakturerad av BRP":
+        "Del av BRP:s balanskostnad som faktureras vidare till RE (beroende på om BRP vidarefakturerar).",
+    "Kompensationsvolym för flexibilitet":
+        "Volym som ligger till grund för kompensation mellan RE och BSP (ofta lika med obalansjusteringen).",
+    "Kompensationsbelopp":
+        "Belopp för kompensation mellan RE och BSP: re_sign × Kompensationsvolym × P_RECOMP.",
+    "Kostnad att fakturera slutkunden":
+        "Total kostnad (inköp + ev. balans + komp) som RE behöver täcka genom kundfakturering.",
+    "Volym att fakturera kunden":
+        "MWh som RE fakturerar slutkund för (normalt samma som kundens förbrukning E_cons).",
+    "Snittpris för inköp el som kan faktureras":
+        "Kostnadsbaserat snittpris: (Kostnad att fakturera slutkunden) / (Volym att fakturera kunden).",
+    "Slutkundens elpris":
+        "Elpris som faktiskt används mot slutkunden: antingen snittpriset eller P_DA om checkboxen är ikryssad.",
+    "Kostnad som faktureras slutkund":
+        "Beloppet på kundens faktura: Slutkundens elpris × Volym som faktureras slutkund.",
+    "Resultat":
+        "RE:s resultat i timmen: inköp från BRP + balanskostnad + kompensation + intäkt från slutkund.",
+}
+
+# Bygg tooltip-matris: samma form som df_re, fyll bara första kolumnen ("Fält")
+tooltips_re = pd.DataFrame("", index=df_re.index, columns=df_re.columns)
+for i, field in enumerate(df_re["Fält"]):
+    tooltips_re.iloc[i, 0] = re_row_tips.get(field, "")
+
+# Skapa Styler med tooltips
+styled_re = df_re.style.set_tooltips(tooltips_re)
+
+# Visa tabellen med hover-tooltips på kolumnen "Fält"
+st.table(styled_re)
 
 
 
@@ -888,7 +1102,7 @@ total_4b = _na_or_sum3(brp_4b, bsp_4b_res, re_4b_res, en_brp_eq_bsp["4b"])
 total_5a = _na_or_sum3(brp_5a, bsp_5a_res, re_5a_res, en_brp_eq_bsp["5a"])
 total_5b = _na_or_sum3(brp_5b, bsp_5b_res, re_5b_res, en_brp_eq_bsp["5b"])
 
-# --- Målresultat (Scenario 5a – BSP resultat) visas bara när BRP=BSP (1a–3b) ---
+# --- Målresultat (Scenario 5a – BSP resultat) ---
 goal_value = bsp_5a_res  # välj 5a (nedreglering) som referens
 goal_row = (
     "Målresultat för aktör (Scenario 5a – BSP resultat)",
@@ -965,10 +1179,34 @@ def _fmt_any(v, unit):
 
 for col in df_sum.columns[1:-1]:
     df_sum[col] = [_fmt_any(v, u) for v, u in zip(df_sum[col], df_sum["Enhet"])]
-for col in df_sum.columns[1:-1]:
-    df_sum[col] = df_sum[col].astype(str)
 
-st.dataframe(df_sum, use_container_width=True, height=360)
+# ---------- (NYTT) Tooltips för sammanställningen ----------
+sum_row_tips = {
+    "BRP resultat":
+        "BRP:s nettokostnad per scenario (från Tabell 1). Negativt = kostnad, positivt = intäkt.",
+    "BSP resultat":
+        "BSP:s nettoresultat per scenario (från Tabell 2). Positivt = intäkt, negativt = kostnad.",
+    "Elhandlare resultat":
+        "Elhandlarens (RE:s) nettoresultat per scenario (från Tabell 3). Positivt = vinst, negativt = förlust.",
+    "BRP+BSP resultat":
+        "Summa BRP resultat + BSP resultat i scenarion där BRP=BSP (1a–3b). I övriga scenarion visas 'NA'.",
+    "BRP+BSP+Elhandlare resultat":
+        "Totalsumma för BRP + BSP + RE i scenarion där BRP=BSP (1a–3b). Ger systemets samlade resultat.",
+    "Målresultat för aktör (Scenario 5a – BSP resultat)":
+        "Mål-/referensnivå: BSP:s nettoresultat i scenario 5a (nedreglering). Används som benchmark.",
+    "Avvikelse mot aktörers målresultat":
+        "Skillnad mellan målresultatet (5a, BSP) och totalsumman per scenario. "
+        "Positivt = bättre än mål, negativt = sämre. 'NA' där jämförelse inte är relevant.",
+}
+
+tooltips_sum = pd.DataFrame("", index=df_sum.index, columns=df_sum.columns)
+for i, field in enumerate(df_sum["Fält"]):
+    tooltips_sum.iloc[i, 0] = sum_row_tips.get(field, "")
+
+styled_sum = df_sum.style.set_tooltips(tooltips_sum)
+
+# Visa tabellen med hover-tooltips på kolumnen "Fält"
+st.table(styled_sum)
 
 
 
@@ -1085,11 +1323,33 @@ df_cust = pd.DataFrame(
 for col in df_cust.columns[1:-1]:
     df_cust[col] = [_fmt_any(v, u) for v, u in zip(df_cust[col], df_cust["Enhet"])]
 
-st.dataframe(df_cust, use_container_width=True, height=280)
+# ---------- (NYTT) Tooltips för kundpris-tabellen ----------
+cust_row_tips = {
+    "Slutkundens elpris (från RE-tabellen)":
+        "Det elpris per MWh som kunden faktiskt betalar i varje scenario, hämtat direkt från RE-tabellen "
+        "(påverkas av checkboxen 'Använd DA pris…').",
+    "Målresultat för slutkunds elpris (Scenario 5a – Slutkundens elpris)":
+        "Mål-/referenspris för slutkunden: slutkundens elpris i scenario 5a (nedreglering). Används som jämförelsenivå.",
+    "Avvikelse slutkundens elpris":
+        "Skillnad mellan kundens pris i respektive scenario och målpriset (5a). "
+        "Positivt värde = dyrare än mål, negativt = billigare än mål.",
+    "Ökad totalkostnad slutkund":
+        "Extra (eller minskad) total kostnad i EUR för kunden jämfört med målpris: "
+        "Avvikelse i pris × volym som faktureras slutkund i scenariot.",
+}
+
+tooltips_cust = pd.DataFrame("", index=df_cust.index, columns=df_cust.columns)
+for i, field in enumerate(df_cust["Fält"]):
+    tooltips_cust.iloc[i, 0] = cust_row_tips.get(field, "")
+
+styled_cust = df_cust.style.set_tooltips(tooltips_cust)
+
+# Visa tabellen med hover-tooltips på kolumnen "Fält"
+st.table(styled_cust)
+
 st.caption(
     "‘Ökad totalkostnad slutkund’ beräknas som (Avvikelse slutkundens elpris × volym som faktureras slutkund) per scenario."
 )
-
 
 # Tillåt omvänd neutralisering till/från slutkund
 allow_reverse_neutral = st.checkbox(
@@ -1108,12 +1368,6 @@ def _safe_float(x):
         return float(x)
     except (TypeError, ValueError):
         return None
-#ersatts med _comp_need(
-#def _pos(x):
-#    val = _safe_float(x)
-#    return val if (val is not None and val > 0) else 0.0
-
-
 
 def _comp_need(val, allow_reverse: bool):
     v = _safe_float(val) or 0.0
@@ -1129,14 +1383,12 @@ def _subtract_base(total, bsp, comp):
     c_val = _safe_float(comp) or 0.0
     return base - c_val
 
-# Kompensationsbehov = max(0, ökad totalkostnad)
-# Kompensationsbehov (signerat om omvänd neutralisering tillåts)
+# Kompensationsbehov = max(0, ökad totalkostnad) eller signerat om omvänd neutralisering
 comp_need_1a = _comp_need(extra_1a, allow_reverse_neutral); comp_need_1b = _comp_need(extra_1b, allow_reverse_neutral)
 comp_need_2a = _comp_need(extra_2a, allow_reverse_neutral); comp_need_2b = _comp_need(extra_2b, allow_reverse_neutral)
 comp_need_3a = _comp_need(extra_3a, allow_reverse_neutral); comp_need_3b = _comp_need(extra_3b, allow_reverse_neutral)
 comp_need_4a = _comp_need(extra_4a, allow_reverse_neutral); comp_need_4b = _comp_need(extra_4b, allow_reverse_neutral)
 comp_need_5a = _comp_need(extra_5a, allow_reverse_neutral); comp_need_5b = _comp_need(extra_5b, allow_reverse_neutral)
-
 
 # Resultat efter kompensation
 tot_after_1a = _subtract_base(total_1a, bsp_1a_res, comp_need_1a)
@@ -1150,15 +1402,28 @@ tot_after_4b = _subtract_base(total_4b, bsp_4b_res, comp_need_4b)
 tot_after_5a = _subtract_base(total_5a, bsp_5a_res, comp_need_5a)
 tot_after_5b = _subtract_base(total_5b, bsp_5b_res, comp_need_5b)
 
-label_neutral = "Neutralisering till/från slutkund" if allow_reverse_neutral else "Kompensation till slutkund för neutralisering"
-rows_comp_total = [
-    (label_neutral, comp_need_1a, comp_need_1b, comp_need_2a, comp_need_2b, comp_need_3a, comp_need_3b,
-     comp_need_4a, comp_need_4b, comp_need_5a, comp_need_5b, "EUR"),
-    ("Aktörers resultat efter kompensation",
-     tot_after_1a, tot_after_1b, tot_after_2a, tot_after_2b, tot_after_3a, tot_after_3b, tot_after_4a,
-     tot_after_4b, tot_after_5a, tot_after_5b, "EUR"),
-]
+label_neutral = (
+    "Neutralisering till/från slutkund"
+    if allow_reverse_neutral
+    else "Kompensation till slutkund för neutralisering"
+)
 
+rows_comp_total = [
+    (
+        label_neutral,
+        comp_need_1a, comp_need_1b, comp_need_2a, comp_need_2b,
+        comp_need_3a, comp_need_3b, comp_need_4a, comp_need_4b,
+        comp_need_5a, comp_need_5b,
+        "EUR",
+    ),
+    (
+        "Aktörers resultat efter kompensation",
+        tot_after_1a, tot_after_1b, tot_after_2a, tot_after_2b,
+        tot_after_3a, tot_after_3b, tot_after_4a, tot_after_4b,
+        tot_after_5a, tot_after_5b,
+        "EUR",
+    ),
+]
 
 df_comp_total = pd.DataFrame(
     rows_comp_total,
@@ -1181,10 +1446,30 @@ df_comp_total = pd.DataFrame(
 for col in df_comp_total.columns[1:-1]:
     df_comp_total[col] = [_fmt_any(v, u) for v, u in zip(df_comp_total[col], df_comp_total["Enhet"])]
 
-st.dataframe(df_comp_total, use_container_width=True, height=220)
+# ---------- (NYTT) Tooltips för kompensations-tabellen ----------
+comp_row_tips = {
+    label_neutral:
+        "Belopp som överförs till/från slutkund för att neutralisera prisavvikelsen: "
+        "beräknas från ‘Ökad totalkostnad slutkund’. "
+        "Om ‘omvänd neutralisering’ är urkryssad tas bara positiva belopp med.",
+    "Aktörers resultat efter kompensation":
+        "Samlat resultat för alla aktörer efter att neutraliserings-/kompensationsbeloppet "
+        "dragits från utgångsresultatet (totalresultat eller BSP-resultat om total saknas).",
+}
+
+tooltips_comp_total = pd.DataFrame("", index=df_comp_total.index, columns=df_comp_total.columns)
+for i, field in enumerate(df_comp_total["Fält"]):
+    tooltips_comp_total.iloc[i, 0] = comp_row_tips.get(field, "")
+
+styled_comp_total = df_comp_total.style.set_tooltips(tooltips_comp_total)
+
+# Visa med hover-tooltips på kolumnen "Fält"
+st.table(styled_comp_total)
+
 st.caption(
     "Neutralisering = prisavvikelse × volym. Om ‘omvänd neutralisering’ är ikryssad kan beloppet vara negativt (kunden betalar tillbaka)."
 )
+
 
 
 # ---------- Export: Excel med alla tabeller ----------
